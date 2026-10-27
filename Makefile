@@ -1,13 +1,13 @@
 # Kaizo build. No host language: the committed seed binary compiles the GPLM core.
 SEED   := seed/kaizo
 KAIZO  := build/kaizo
-SUITES := tests/selftest.gp libs/rand libs/http libs/map apps/snake/main.gp apps/hello-web/main.gp
+SUITES := tests/selftest.gp libs/rand libs/http libs/map libs/sha256 apps/snake/main.gp apps/hello-web/main.gp
 
 .PHONY: all core test selfhost e2e seed clean
 all: core test
 
 core: $(KAIZO)
-$(KAIZO): $(wildcard core/*.gp core/rt/*.gp libs/map/*.gp)
+$(KAIZO): $(wildcard core/*.gp core/rt/*.gp libs/map/*.gp libs/sha256/*.gp)
 	@mkdir -p build
 	$(SEED) build core -o $(KAIZO)
 

@@ -277,6 +277,19 @@ fn start_windows(t: Target, mode: Mode) -> List[Code]
   [start, veh, ctrl]
 end
 
+# dyld calls _start as main(argc, argv, envp); C calls use the platform ABI registers
 fn start_macos(t: Target, mode: Mode) -> List[Code]
-  []
+  let a0 = arg_reg(t, 0)
+  let a1 = arg_reg(t, 1)
+  let a2 = arg_reg(t, 2)
+  let start = cat([CLab("_start"), CI([IStG("g_argc", a0), IStG("g_argv", a1), IStG("g_envp", a2)]), self_reloc(),
+    CI(craw(t, "mmap", [0, 34359738368, 3, 4098, -1, 0])), CI([IMov(r14, rax)]),
+    CI(craw(t, "mmap", [0, stack_size, 3, 4098, -1, 0])), CI([IAluI(0, rax, stack_size), IMov(rsp, rax)]),
+    CI([IMovI(a0, 2), IAddr(a1, "sighandler"), ICRaw("signal"), IMovI(a0, 15), IAddr(a1, "sighandler"), ICRaw("signal"),
+      IMovI(a0, 13), IMovI(a1, 1), ICRaw("signal")]),
+    call_l("init"), call_main(mode), CI(craw(t, "exit", [0]))])
+  let handler = cat([CLab("sighandler"), CI([IStG("sig_num", a0), ILdG(a2, "termios_ptr"), IAlu(133, a2, a2)]), jcc(cc_e, ".sigskip"),
+    CI([IMovI(a0, 0), IMovI(a1, 0), ICRaw("tcsetattr"), IMovI(a0, 1), IAddr(a1, "cursor_on"), IMovI(a2, 6), ICRaw("write")]),
+    CLab(".sigskip"), CI([ILdG(a0, "sig_num"), IAluI(0, a0, 128), ICRaw("_exit")])])
+  [start, handler]
 end
