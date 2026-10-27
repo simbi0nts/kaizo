@@ -1,8 +1,10 @@
 # Minimal X11 client, speaking the X protocol directly over the server's Unix socket (no Xlib).
 # Enough for simple 2D apps: one window, filled rectangles, text, key presses, expose, close.
-# Drawing functions return request bytes; batch them and send once per frame with `send`.
+# Drawing functions take the window's Draw context and return request bytes; batch them and send
+# once per frame with `send`.
 
-type X = { sock: Conn, root: Int, id_base: Int, win: Int, gc: Int, font: Int, buf: String } end
+type Draw = { win: Int, gc: Int } end
+type X = { sock: Conn, root: Int, id_base: Int, draw: Draw, buf: String } end
 type XEvent = XKey(String) | XExpose | XClosed | XOther end
 type Polled = { x: X, events: List[XEvent] } end
 type Auth = { name: String, data: String } end
@@ -123,7 +125,7 @@ fn open() -> Result[X, String] ! [io, fs, net]
               else
                 let vendor = u16(s, 24)
                 let screen = add(add(40, add(vendor, mod(sub(4, mod(vendor, 4)), 4))), mul(8, str_byte(s, 29)))
-                Ok(X { sock: c, root: u32(s, screen), id_base: u32(s, 12), win: 0, gc: 0, font: 0, buf: "" })
+                Ok(X { sock: c, root: u32(s, screen), id_base: u32(s, 12), draw: Draw { win: 0, gc: 0 }, buf: "" })
               end
           end
       end
@@ -152,24 +154,24 @@ fn window(x: X, w: Int, h: Int, title: String) -> X ! [net]
   let create_gc = request(55, 0, cat_all([lbytes(gc, 4), lbytes(win, 4), lbytes(0x1400C, 4), lbytes(0xFFFFFF, 4), lbytes(0, 4), lbytes(font, 4), lbytes(0, 4)]))
   let map_win = request(8, 0, lbytes(win, 4))
   send(x, [create, name, hints, open_font, create_gc, map_win])
-  { x with win: win, gc: gc, font: font }
+  { x with draw: Draw { win: win, gc: gc } }
 end
 
 # ---------- drawing (each returns request bytes) ----------
 
-fn color(x: X, rgb: Int) -> String
-  request(56, 0, cat_all([lbytes(x.gc, 4), lbytes(4, 4), lbytes(rgb, 4)]))
+fn color(d: Draw, rgb: Int) -> String
+  request(56, 0, cat_all([lbytes(d.gc, 4), lbytes(4, 4), lbytes(rgb, 4)]))
 end
 
-fn fill(x: X, rgb: Int, rects: List[Rect]) -> String
+fn fill(d: Draw, rgb: Int, rects: List[Rect]) -> String
   let body = list_fold(rects, [], fn(acc, r) list_concat(acc, cat_all([lbytes(r.x, 2), lbytes(r.y, 2), lbytes(r.w, 2), lbytes(r.h, 2)])) end)
-  str_cat(color(x, rgb), request(70, 0, cat_all([lbytes(x.win, 4), lbytes(x.gc, 4), body])))
+  str_cat(color(d, rgb), request(70, 0, cat_all([lbytes(d.win, 4), lbytes(d.gc, 4), body])))
 end
 
 # text at (px, py) = left end of the baseline; drawn with a black background
-fn text(x: X, rgb: Int, px: Int, py: Int, s: String) -> String
+fn text(d: Draw, rgb: Int, px: Int, py: Int, s: String) -> String
   let n = min(str_len(s), 255)
-  str_cat(color(x, rgb), request(76, n, cat_all([lbytes(x.win, 4), lbytes(x.gc, 4), lbytes(px, 2), lbytes(py, 2), bytes(str_slice(s, 0, n)), pad(n)])))
+  str_cat(color(d, rgb), request(76, n, cat_all([lbytes(d.win, 4), lbytes(d.gc, 4), lbytes(px, 2), lbytes(py, 2), bytes(str_slice(s, 0, n)), pad(n)])))
 end
 
 # 24-bit colour as one 32-bit ZPixmap pixel (little-endian BGRX)
@@ -178,13 +180,13 @@ fn pixel(rgb: Int) -> String
 end
 
 # an image of w x h pixels (rows of 4*w bytes) at (px, py); split into strips below the 256 KiB request limit
-fn image(x: X, px: Int, py: Int, w: Int, h: Int, data: String) -> List[String]
+fn image(d: Draw, px: Int, py: Int, w: Int, h: Int, data: String) -> List[String]
   let per = max(1, div(240000, mul(w, 4)))
   list_map(list_range(0, div(add(h, sub(per, 1)), per)), fn(i)
     let y0 = mul(i, per)
     let rows = min(per, sub(h, y0))
     let part = str_slice(data, mul(mul(y0, w), 4), mul(mul(add(y0, rows), w), 4))
-    request(72, 2, cat_all([lbytes(x.win, 4), lbytes(x.gc, 4), lbytes(w, 2), lbytes(rows, 2), lbytes(px, 2), lbytes(add(py, y0), 2), [0, 24, 0, 0], bytes(part)]))
+    request(72, 2, cat_all([lbytes(d.win, 4), lbytes(d.gc, 4), lbytes(w, 2), lbytes(rows, 2), lbytes(px, 2), lbytes(add(py, y0), 2), [0, 24, 0, 0], bytes(part)]))
   end)
 end
 
@@ -264,7 +266,7 @@ test "pixel is BGRX"
 end
 
 test "image strips stay below the request limit"
-  let reqs = image(X { sock: Unit, root: 1, id_base: 0, win: 2, gc: 3, font: 4, buf: "" }, 0, 0, 640, 400, str_repeat(pixel(0), mul(640, 400)))
+  let reqs = image(Draw { win: 2, gc: 3 }, 0, 0, 640, 400, str_repeat(pixel(0), mul(640, 400)))
   expect_eq(list_len(reqs), 5)
   expect(lt(str_len(unwrap_or(list_get(reqs, 0), "")), 262140), "strip fits")
 end

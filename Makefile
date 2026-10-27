@@ -13,6 +13,8 @@ $(KAIZO): $(wildcard core/*.gp core/rt/*.gp libs/map/*.gp libs/sha256/*.gp)
 
 test: core
 	@for s in $(SUITES); do $(KAIZO) test $$s || exit 1; done
+	@./tests/type_errors.sh $(KAIZO) > build/type_errors.log || { cat build/type_errors.log; exit 1; }
+	@echo "type errors: $$(grep -c PASS build/type_errors.log) wrong programs rejected as expected"
 
 # the core must reproduce itself byte for byte
 selfhost: core

@@ -62,7 +62,7 @@ fn emit(g: G, c: Code) -> G
   { g with code: CCat(g.code, c) }
 end
 
-fn eb(g: G, b: List[Int]) -> G
+fn eb(g: G, b: List[Ins]) -> G
   { g with code: CCat(g.code, CI(b)) }
 end
 
@@ -126,7 +126,7 @@ end
 
 # ---------- small emitters ----------
 
-fn load_loc(cx: Cx, r: Int, loc: Loc) -> List[Int]
+fn load_loc(cx: Cx, r: Int, loc: Loc) -> List[Ins]
   match loc
     case LSlot(s) -> ldm(r, rbp, slot_disp(s))
     case LArg(i) -> ldm(r, rbp, add(16, mul(8, sub(sub(cx.nargs, 1), i))))
@@ -134,7 +134,7 @@ fn load_loc(cx: Cx, r: Int, loc: Loc) -> List[Int]
   end
 end
 
-fn tag_rax() -> List[Int]
+fn tag_rax() -> List[Ins]
   list_concat(shift(4, rax, 1), alu_imm(0, rax, 1))
 end
 

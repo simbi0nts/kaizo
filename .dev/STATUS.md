@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0019 done — Phase 0 complete: CI green on Linux, Windows, macOS arm64 and x86-64
-Next step:    0020 — static type checker (Phase 1)
+Current step: 0020 done — static types (inference) for all code except the runtime
+Next step:    0021 — effects in function types
 
 ## Reserved steps
-0020 — static type checker: inference, generics, records (this session)
 0021 — function types carry effects (this session)
 0022 — use the types: RC skips Int values, docs (this session)
 

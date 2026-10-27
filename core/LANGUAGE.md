@@ -47,7 +47,13 @@ end
 ```
 Types: `Int` (63-bit signed), `String`, `Bool`, `Unit`, `List[T]`, `Option[T]`, `Result[T, E]`,
 `Fn(A, B) -> C`, `Listener`, `Conn`, single capital letters are type variables.
-The checker verifies names, arity, record fields, exhaustiveness and effects; full type checking is planned.
+**Static types.** Everything is type-checked with inference: you annotate only top-level signatures
+and type declarations; local `let`s and lambda parameters are inferred (lambda parameters get their
+types from the function they are passed to). In a signature, a single capital letter (`T`, `A`) is a
+type variable — unless a type with that name is declared. Inside the function body a type variable
+is fixed (you cannot return an `Int` where `T` is expected); at each call it becomes whatever the
+arguments are. Generic types: `type Box[T] = { v: T } end`, `Option[T]`, `Result[T, E]`, `List[T]`,
+function types `Fn(A, B) -> C`. Errors name the expected and the actual type at the exact position.
 
 ## Expressions
 ```
@@ -114,8 +120,9 @@ Effectful:
 Types and constructors are global (no two modules may define the same name).
 
 ## Known gaps of v1 (do not rely on them)
-- No static types yet: a wrong-typed argument fails at run time (with file:line:col for
-  operators, field access and calls; errors inside library builtins name the builtin only).
+- Local `let` bindings are not generic: a lambda stored in a `let` must be used at one type.
+- When several record types share a field name and nothing tells the checker which one an
+  expression is, it asks for an annotation (give the function parameter or result a type).
 - Memory is managed automatically (reference counting inferred by the compiler, step 0013); nothing to write.
 - Targets: Linux x86-64, Windows x64, macOS x86-64 and arm64.
 - Effects passed through function values (e.g. a handler argument) are not tracked.

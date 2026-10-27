@@ -67,7 +67,7 @@ end
 fn check_program(p: Program) -> List[Diag]
   let c0 = Ck { prog: p, mod: get_module(p, prelude_module), fn_name: "", declared: [], any_eff: false, reported: [], diags: [] }
   let c = list_fold(p.order, c0, fn(acc, name) check_module({ acc with mod: get_module(p, name) }) end)
-  sort_diags(c.diags)
+  if gt(list_len(c.diags), 0) then sort_diags(c.diags) else sort_diags(typecheck_program(p)) end
 end
 
 fn check_module(c: Ck) -> Ck

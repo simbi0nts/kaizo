@@ -234,7 +234,7 @@ fn loop(x: X, start: Int, frames: Int, last_fps: Int, fps_at: Int) -> Int ! [net
     let fresh = gt(sub(now, fps_at), 1000)
     let fps = if fresh then div(mul(frames, 1000), max(1, sub(now, start))) else last_fps end
     let label = str_join(["KAIZO 3D  -  software renderer in GPLM  -  ", show(fps), " fps (frame ", show(took), " ms)"], "")
-    x11.send(polled.x, list_push(x11.image(polled.x, 0, 0, w, h, img), x11.text(polled.x, 0xFFFFFF, 10, 18, label)))
+    x11.send(polled.x, list_push(x11.image(polled.x.draw, 0, 0, w, h, img), x11.text(polled.x.draw, 0xFFFFFF, 10, 18, label)))
     sleep_ms(max(1, sub(33, sub(now_ms(), now))))
     loop(polled.x, start, add(frames, 1), fps, if fresh then now else fps_at end)
   end

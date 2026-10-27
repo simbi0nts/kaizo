@@ -32,7 +32,7 @@ fn cell_rect(p: Pos, inset: Int) -> Rect
 end
 
 # the whole frame as X requests (pure)
-fn frame(x: X, g: Game) -> List[String]
+fn frame(x: Draw, g: Game) -> List[String]
   let checker = list_filter(list_map(list_range(0, mul(cols, rows)), fn(i) Pos { x: mod(i, cols), y: div(i, cols) } end), fn(p) eq(mod(add(p.x, p.y), 2), 0) end)
   let body = match g.body
     case [_, ..rest] -> rest
@@ -75,11 +75,11 @@ fn game_loop(x: X, g: Game) -> Game ! [net, time]
     case Quit -> g1
     case Playing ->
       let g2 = snake.tick(g1)
-      x11.send(polled.x, frame(polled.x, g2))
+      x11.send(polled.x, frame(polled.x.draw, g2))
       sleep_ms(max(0, sub(tick_ms, sub(now_ms(), started))))
       game_loop(polled.x, g2)
     case Dead ->
-      x11.send(polled.x, frame(polled.x, g1))
+      x11.send(polled.x, frame(polled.x.draw, g1))
       sleep_ms(50)
       game_loop(polled.x, g1)
   end
@@ -98,7 +98,7 @@ end
 
 test "frame draws background, cells, snake, food and text"
   let g = snake.new_game(cols, rows, rand.seeded(1))
-  expect_eq(list_len(frame(X { sock: Unit, root: 1, id_base: 0, win: 2, gc: 3, font: 4, buf: "" }, g)), 7)
+  expect_eq(list_len(frame(Draw { win: 2, gc: 3 }, g)), 7)
 end
 
 test "r restarts only after game over, esc quits"
