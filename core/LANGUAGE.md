@@ -52,6 +52,7 @@ The checker verifies names, arity, record fields, exhaustiveness and effects; fu
 ## Expressions
 ```
 42  -7  "text"  true  false  Unit        # literals; Unit is the "nothing" value
+0x1F  -0xff                              # hex Int literals (digits any case; 0x alone is an error)
 [1, 2, 3]                                # list
 Pos { x: 1, y: 2 }                       # record: every field, any order
 { p with x: 5 }                          # copy of p with x changed
@@ -113,7 +114,7 @@ Types and constructors are global (no two modules may define the same name).
 - No static types yet: a wrong-typed argument fails at run time (with file:line:col for
   operators, field access and calls; errors inside library builtins name the builtin only).
 - No garbage collector yet: memory is only freed when the program exits.
-- Targets: Linux x86-64, Windows x64, macOS x86-64 and arm64. No hex literals yet (write decimal).
+- Targets: Linux x86-64, Windows x64, macOS x86-64 and arm64.
 - Effects passed through function values (e.g. a handler argument) are not tracked.
 - A local `let` lambda cannot call itself; write a top-level fn for recursion.
 

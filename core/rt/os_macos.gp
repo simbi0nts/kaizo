@@ -2,7 +2,7 @@
 # Variadic C functions are avoided on purpose (arm64 passes variadic arguments on the stack).
 
 fn errno() -> Int
-  bit_and(prim_peek(prim_ccall("__error", [])), 4294967295)
+  bit_and(prim_peek(prim_ccall("__error", [])), 0xFFFFFFFF)
 end
 
 fn os_errmsg(r: Int) -> String
@@ -95,7 +95,7 @@ fn os_tcp_listen(addr: String) -> Result[Int, String]
       let fd = neg_errno(prim_ccall32("socket", [2, 1, 0]))
       if lt(fd, 0) then Err(os_errmsg(fd)) else
         let one = str_from_bytes([1, 0, 0, 0])
-        prim_ccall32("setsockopt", [fd, 65535, 4, prim_addr(one), 4])
+        prim_ccall32("setsockopt", [fd, 0xFFFF, 4, prim_addr(one), 4])
         let r = neg_errno(prim_ccall32("bind", [fd, prim_addr(sa), 16]))
         if lt(r, 0) then
           prim_ccall32("close", [fd])

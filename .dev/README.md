@@ -44,3 +44,4 @@ Status: done | in progress | proposal (waiting for human decision)
 | [0009](0009-native-back-end.md) | Native back end in GPLM; self-hosting fixpoint | done |
 | [0010](0010-remove-go.md) | Go removed; both test projects pass on the native core | done |
 | [0011](0011-cross-platform-plan.md) | Windows x64, macOS x86-64/arm64 targets + CI | implemented, awaiting CI |
+| [0012](0012-hex-literals.md) | Hexadecimal integer literals; compiler constants in hex | done |

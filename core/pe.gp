@@ -2,7 +2,7 @@
 # Fixed image base, no relocations needed (code is position independent; data pointers are linked
 # for the image base and the start-up self-relocation sees a zero slide).
 
-let pe_base = 5368709120
+let pe_base = 0x140000000
 let pe_file_align = 512
 
 type Dll = { name: String, syms: List[String] } end
@@ -70,17 +70,17 @@ fn write_pe(o: Out) -> Image
   let iat_start = rva("iat:0")
   let iat_size = sub(rva("idata_end"), iat_start)
   let dos = list_concat(list_concat([77, 90], lebytes(0, 58)), lebytes(64, 4))
-  let coff = le_all([[80, 69, 0, 0], lebytes(34404, 2), lebytes(2, 2), lebytes(0, 12), lebytes(240, 2), lebytes(35, 2)])
+  let coff = le_all([[80, 69, 0, 0], lebytes(0x8664, 2), lebytes(2, 2), lebytes(0, 12), lebytes(0xF0, 2), lebytes(0x23, 2)])
   let dirs = le_all([lebytes(0, 8), lebytes(rva("idata"), 4), lebytes(mul(20, add(list_len(dlls), 1)), 4), lebytes(0, 80),
     lebytes(iat_start, 4), lebytes(iat_size, 4), lebytes(0, 24)])
-  let opt = le_all([lebytes(523, 2), [1, 0], lebytes(text_raw, 4), lebytes(data_raw, 4), lebytes(0, 4), lebytes(rva("_start"), 4), lebytes(text_rva, 4),
+  let opt = le_all([lebytes(0x20B, 2), [1, 0], lebytes(text_raw, 4), lebytes(data_raw, 4), lebytes(0, 4), lebytes(rva("_start"), 4), lebytes(text_rva, 4),
     lebytes(pe_base, 8), lebytes(4096, 4), lebytes(pe_file_align, 4), lebytes(6, 2), lebytes(0, 2), lebytes(0, 4), lebytes(6, 2), lebytes(0, 2), lebytes(0, 4),
-    lebytes(image_size, 4), lebytes(headers, 4), lebytes(0, 4), lebytes(3, 2), lebytes(33024, 2),
+    lebytes(image_size, 4), lebytes(headers, 4), lebytes(0, 4), lebytes(3, 2), lebytes(0x8100, 2),
     lebytes(268435456, 8), lebytes(268435456, 8), lebytes(1048576, 8), lebytes(4096, 8), lebytes(0, 4), lebytes(16, 4), dirs])
   let sec_text = le_all([[46, 116, 101, 120, 116, 0, 0, 0], lebytes(str_len(l.text), 4), lebytes(text_rva, 4), lebytes(text_raw, 4), lebytes(headers, 4),
-    lebytes(0, 12), lebytes(1610612768, 4)])
+    lebytes(0, 12), lebytes(0x60000020, 4)])
   let sec_data = le_all([[46, 100, 97, 116, 97, 0, 0, 0], lebytes(str_len(l.data), 4), lebytes(data_rva, 4), lebytes(data_raw, 4), lebytes(add(headers, text_raw), 4),
-    lebytes(0, 12), lebytes(3221225536, 4)])
+    lebytes(0, 12), lebytes(0xC0000040, 4)])
   let head = str_from_bytes(le_all([dos, coff, opt, sec_text, sec_data]))
   let bytes = join_all(strs_from([head, zeros_str(sub(headers, str_len(head))), l.text, zeros_str(sub(text_raw, str_len(l.text))), l.data, zeros_str(sub(data_raw, str_len(l.data)))]))
   Image { bytes: bytes, missing: l.missing }

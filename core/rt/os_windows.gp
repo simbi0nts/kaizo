@@ -4,7 +4,7 @@
 let h_in = prim_ccall("GetStdHandle", [-10])
 let h_out = prim_ccall("GetStdHandle", [-11])
 let h_err = prim_ccall("GetStdHandle", [-12])
-let wsa_ok = prim_ccall32("ws2_32.dll!WSAStartup", [514, prim_addr(zeros(512))])
+let wsa_ok = prim_ccall32("ws2_32.dll!WSAStartup", [0x202, prim_addr(zeros(512))])
 
 fn last_error() -> Int
   prim_ccall32("GetLastError", [])
@@ -196,7 +196,7 @@ end
 fn os_tcp_read(c: Int, n: Int, timeout: Int) -> Result[String, String]
   let tv = zeros(8)
   put_le(tv, 0, max(1, timeout), 4)
-  prim_ccall32("ws2_32.dll!setsockopt", [c, 65535, 4102, prim_addr(tv), 4])
+  prim_ccall32("ws2_32.dll!setsockopt", [c, 0xFFFF, 0x1006, prim_addr(tv), 4])
   let buf = prim_str_new(n)
   let r = prim_ccall32("ws2_32.dll!recv", [c, prim_addr(buf), n, 0])
   if lt(r, 0) then Err(os_errmsg(wsa_error())) else Ok(str_slice(buf, 0, r)) end
@@ -232,7 +232,7 @@ fn read_handle(h: Int, acc: List[String]) -> Result[String, String]
 end
 
 fn os_read_file(path: String) -> Result[String, String]
-  let h = prim_ccall("CreateFileA", [prim_addr(cstr(path)), 2147483648, 1, 0, 3, 128, 0])
+  let h = prim_ccall("CreateFileA", [prim_addr(cstr(path)), 0x80000000, 1, 0, 3, 128, 0])
   if eq(h, -1) then Err(str_join(["open ", path, ": ", win_errmsg(last_error())], "")) else
     let r = read_handle(h, [])
     prim_ccall32("CloseHandle", [h])
@@ -241,7 +241,7 @@ fn os_read_file(path: String) -> Result[String, String]
 end
 
 fn os_write_file(path: String, content: String, mode_bits: Int) -> Result[Unit, String]
-  let h = prim_ccall("CreateFileA", [prim_addr(cstr(path)), 1073741824, 0, 0, 2, 128, 0])
+  let h = prim_ccall("CreateFileA", [prim_addr(cstr(path)), 0x40000000, 0, 0, 2, 128, 0])
   if eq(h, -1) then Err(str_join(["open ", path, ": ", win_errmsg(last_error())], "")) else
     let w = write_handle(h, content, 0)
     prim_ccall32("CloseHandle", [h])
@@ -275,7 +275,7 @@ fn spawn_wait(exe: String, cmdline: String) -> Int
   let ok = prim_ccall32("CreateProcessA", [prim_addr(cstr(exe)), prim_addr(cstr(cmdline)), 0, 0, 1, 0, 0, 0, prim_addr(si), prim_addr(pi)])
   if eq(ok, 0) then -1 else
     let hp = u_le(pi, 0, 8)
-    prim_ccall32("WaitForSingleObject", [hp, 4294967295])
+    prim_ccall32("WaitForSingleObject", [hp, 0xFFFFFFFF])
     let code = zeros(8)
     prim_ccall32("GetExitCodeProcess", [hp, prim_addr(code)])
     prim_ccall32("CloseHandle", [hp])

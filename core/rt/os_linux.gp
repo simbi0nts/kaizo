@@ -60,20 +60,20 @@ end
 
 fn os_term_raw() -> Result[String, String]
   let t = zeros(64)
-  let r = sys(16, 0, 21505, prim_addr(t))
+  let r = sys(16, 0, 0x5401, prim_addr(t))
   if lt(r, 0) then Err(str_cat("stdin is not a terminal: ", os_errmsg(r))) else
     let saved = str_slice(t, 0, 64)
     let lf = prim_byte(t, 12)
     prim_set_byte(t, 12, sub(sub(lf, if has_bit(lf, 2) then 2 else 0 end), if has_bit(lf, 8) then 8 else 0 end))
     prim_set_byte(t, 22, 0)
     prim_set_byte(t, 23, 0)
-    let r2 = sys(16, 0, 21506, prim_addr(t))
+    let r2 = sys(16, 0, 0x5402, prim_addr(t))
     if lt(r2, 0) then Err(os_errmsg(r2)) else Ok(saved) end
   end
 end
 
 fn os_term_set(saved: String) -> Unit
-  sys(16, 0, 21506, prim_addr(saved))
+  sys(16, 0, 0x5402, prim_addr(saved))
   Unit
 end
 
@@ -105,7 +105,7 @@ fn os_tcp_listen(addr: String) -> Result[Int, String]
   match sockaddr(addr, false)
     case None -> Err(str_cat("bad address (want ip:port): ", addr))
     case Some(sa) ->
-      let fd = sys(41, 2, 524289, 0)
+      let fd = sys(41, 2, 0x80001, 0)
       if lt(fd, 0) then Err(os_errmsg(fd)) else
         let one = str_from_bytes([1, 0, 0, 0])
         sys5(54, fd, 1, 2, prim_addr(one), 4)
@@ -171,7 +171,7 @@ fn os_read_file(path: String) -> Result[String, String]
 end
 
 fn os_write_file(path: String, content: String, mode_bits: Int) -> Result[Unit, String]
-  let fd = sys(2, prim_addr(cstr(path)), 577, mode_bits)
+  let fd = sys(2, prim_addr(cstr(path)), 0x241, mode_bits)
   if lt(fd, 0) then Err(str_join(["open ", path, ": ", os_errmsg(fd)], "")) else
     let w = write_fd(fd, content, 0)
     sys(91, fd, mode_bits, 0)
@@ -199,7 +199,7 @@ fn read_dir(fd: Int, acc: List[String]) -> Result[List[String], String]
 end
 
 fn os_list_dir(path: String) -> Result[List[String], String]
-  let fd = sys(2, prim_addr(cstr(path)), 65536, 0)
+  let fd = sys(2, prim_addr(cstr(path)), 0x10000, 0)
   if lt(fd, 0) then Err(str_join(["open ", path, ": ", os_errmsg(fd)], "")) else
     let r = read_dir(fd, [])
     sys(3, fd, 0, 0)

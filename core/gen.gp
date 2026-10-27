@@ -131,7 +131,7 @@ type GW = { g: G, words: List[Code] } end
 
 fn gen_runtime_data(g: G, t: Target) -> G
   let sig = if eq(t.os, "linux") then
-    cat([CLab("sigact"), CA64("sighandler"), CB(lebytes(67108864, 8)), CA64("sighandler"), CB(lebytes(0, 8)), CLab("sigign"), CB(lebytes(1, 32))])
+    cat([CLab("sigact"), CA64("sighandler"), CB(lebytes(0x4000000, 8)), CA64("sighandler"), CB(lebytes(0, 8)), CLab("sigign"), CB(lebytes(1, 32))])
   else CNil end
   emit_data(g, cat([sig,
     CLab("TRUE"), CB(list_concat(lebytes(5, 8), lebytes(1, 8))),
@@ -181,7 +181,7 @@ fn call_main(mode: Mode) -> Code
 end
 
 fn sys_mmap(size: Int) -> List[Ins]
-  [IMovI(rax, 9), IMovI(rdi, 0), IMovI(rsi, size), IMovI(rdx, 3), IMovI(r10, 16418), IMovI(r8, -1), IMovI(r9, 0), ISys]
+  [IMovI(rax, 9), IMovI(rdi, 0), IMovI(rsi, size), IMovI(rdx, 3), IMovI(r10, 0x4022), IMovI(r8, -1), IMovI(r9, 0), ISys]
 end
 
 fn start_linux(mode: Mode) -> List[Code]
@@ -194,7 +194,7 @@ fn start_linux(mode: Mode) -> List[Code]
     linux_sigaction(2, "sigact"), linux_sigaction(15, "sigact"), linux_sigaction(13, "sigign"),
     call_l("init"), call_main(mode), CI([IMovI(rax, 231), IMovI(rdi, 0), ISys])])
   let handler = cat([CLab("sighandler"), CI([IStG("sig_num", rdi), ILdG(rdx, "termios_ptr"), IAlu(133, rdx, rdx)]), jcc(cc_e, ".sigskip"),
-    CI([IMovI(rax, 16), IMovI(rdi, 0), IMovI(rsi, 21506), ISys, IMovI(rax, 1), IMovI(rdi, 1), IAddr(rsi, "cursor_on"), IMovI(rdx, 6), ISys]),
+    CI([IMovI(rax, 16), IMovI(rdi, 0), IMovI(rsi, 0x5402), ISys, IMovI(rax, 1), IMovI(rdi, 1), IAddr(rsi, "cursor_on"), IMovI(rdx, 6), ISys]),
     CLab(".sigskip"), CI([ILdG(rdi, "sig_num"), IAluI(0, rdi, 128), IMovI(rax, 231), ISys])])
   [start, handler]
 end
@@ -253,19 +253,19 @@ end
 
 fn start_windows(t: Target, mode: Mode) -> List[Code]
   let start = cat([CLab("_start"), self_reloc(),
-    CI(craw(t, "VirtualAlloc", [0, heap_size, 8192, 4])),
+    CI(craw(t, "VirtualAlloc", [0, heap_size, 0x2000, 4])),
     CI([IMov(r14, rax), IStG("heap_base", rax), IMovI(rcx, heap_size), IAlu(1, rcx, rax), IStG("heap_end", rcx),
       IMovI(rcx, 1), IAddr(rdx, "veh"), ICRaw("AddVectoredExceptionHandler"),
       IAddr(rcx, "ctrlhandler"), IMovI(rdx, 1), ICRaw("SetConsoleCtrlHandler")]),
     CI(craw(t, "SetConsoleOutputCP", [65001])),
     call_l("init"), call_main(mode), CI(craw(t, "ExitProcess", [0]))])
   # heap pages are reserved up front and committed on first touch (access violation inside the heap)
-  let veh = cat([CLab("veh"), CI([IPush(rbx), ILd(rax, rcx, 0), ILd(rdx, rax, 0), IMovI(r8, 4294967295), IAlu(33, rdx, r8), IMovI(r8, 3221225477), IAlu(57, rdx, r8)]),
+  let veh = cat([CLab("veh"), CI([IPush(rbx), ILd(rax, rcx, 0), ILd(rdx, rax, 0), IMovI(r8, 0xFFFFFFFF), IAlu(33, rdx, r8), IMovI(r8, 0xC0000005), IAlu(57, rdx, r8)]),
     jcc(cc_ne, ".veh_no"), CI([ILd(rdx, rax, 40), ILdG(r8, "heap_base"), IAlu(57, rdx, r8)]), jcc(cc_l, ".veh_no"),
     CI([ILdG(r8, "heap_end"), IAlu(57, rdx, r8)]), jcc(cc_ge, ".veh_no"),
     CI([IMov(rcx, rdx), IAluI(4, rcx, -4096), IAlu(41, r8, rcx), IMovI(rdx, 67108864), IAlu(57, r8, rdx)]), jcc(cc_ge, ".veh_size"),
     CI([IMov(rdx, r8)]), CLab(".veh_size"),
-    CI([IMovI(r8, 4096), IMovI(r9, 4), ICRaw("VirtualAlloc"), IMovI(rax, -1), IPop(rbx)]), CB([195]),
+    CI([IMovI(r8, 0x1000), IMovI(r9, 4), ICRaw("VirtualAlloc"), IMovI(rax, -1), IPop(rbx)]), CB([195]),
     CLab(".veh_no"), CI([IMovI(rax, 0), IPop(rbx)]), CB([195])])
   # Ctrl+C: restore the console modes saved by term_raw, show the cursor, exit 130
   let ctrl = cat([CLab("ctrlhandler"), CI([ILdG(rdx, "termios_ptr"), IAlu(133, rdx, rdx)]), jcc(cc_e, ".ctrl_exit"),
@@ -283,8 +283,8 @@ fn start_macos(t: Target, mode: Mode) -> List[Code]
   let a1 = arg_reg(t, 1)
   let a2 = arg_reg(t, 2)
   let start = cat([CLab("_start"), CI([IStG("g_argc", a0), IStG("g_argv", a1), IStG("g_envp", a2)]), self_reloc(),
-    CI(craw(t, "mmap", [0, 34359738368, 3, 4098, -1, 0])), CI([IMov(r14, rax)]),
-    CI(craw(t, "mmap", [0, stack_size, 3, 4098, -1, 0])), CI([IAluI(0, rax, stack_size), IMov(rsp, rax)]),
+    CI(craw(t, "mmap", [0, 34359738368, 3, 0x1002, -1, 0])), CI([IMov(r14, rax)]),
+    CI(craw(t, "mmap", [0, stack_size, 3, 0x1002, -1, 0])), CI([IAluI(0, rax, stack_size), IMov(rsp, rax)]),
     CI([IMovI(a0, 2), IAddr(a1, "sighandler"), ICRaw("signal"), IMovI(a0, 15), IAddr(a1, "sighandler"), ICRaw("signal"),
       IMovI(a0, 13), IMovI(a1, 1), ICRaw("signal")]),
     call_l("init"), call_main(mode), CI(craw(t, "exit", [0]))])

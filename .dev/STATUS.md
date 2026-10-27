@@ -1,6 +1,6 @@
 # Current status
 
-Current step: 0011 implemented — targets linux-x64, windows-x64, macos-x64, macos-arm64
+Current step: 0012 done — hex Int literals (`0x1F`); targets linux-x64, windows-x64, macos-x64, macos-arm64 (0011, awaiting CI)
 Next step:    run CI on GitHub (needs a remote), fix whatever the real Windows/macOS runners report
 
 ## Quick check
