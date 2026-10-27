@@ -28,6 +28,8 @@ Status: done | in progress | proposal (waiting for human decision)
 ## Next step
 ```
 
+Long-term plan: [ROADMAP.md](ROADMAP.md)
+
 ## Index
 
 | Step | Title | Status |
