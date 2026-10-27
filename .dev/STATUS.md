@@ -1,7 +1,7 @@
 # Current status
 
-Current step: 0008 done — GPLM front end (lexer, parser, checker)
-Next step:    0009 — native back end
+Current step: 0009 done — native self-hosted compiler, fixpoint reached
+Next step:    0010 — remove Go, seed binary
 
 Go code now lives in `bootstrap/` (built as build/kaizo-go) and is used only to bootstrap.
 

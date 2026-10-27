@@ -47,8 +47,7 @@ let prim_list = [
   b("prim_byte", 2, ""), b("prim_set_byte", 3, ""), b("prim_str_new", 1, ""), b("prim_list_new", 1, ""),
   b("prim_list_view", 3, ""), b("prim_record_copy", 1, ""), b("prim_addr", 1, ""), b("prim_peek", 1, ""),
   b("prim_syscall", 7, ""), b("prim_ctor_name", 1, ""), b("prim_record_name", 1, ""), b("prim_field_name", 2, ""),
-  b("prim_argv", 0, ""), b("prim_call", 2, ""), b("prim_is_fn", 1, ""), b("prim_fail", 1, ""), b("prim_handle", 1, ""),
-  b("prim_term_save", 1, "")
+  b("prim_argv", 0, ""), b("prim_handle", 1, ""), b("prim_term_save", 1, ""), b("prim_peek8", 1, ""), b("prim_copy", 5, "")
 ]
 
 fn table(l: List[Builtin]) -> Map[Builtin]

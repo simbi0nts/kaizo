@@ -41,3 +41,4 @@ Status: done | in progress | proposal (waiting for human decision)
 | 0006 | Blind usability test (on branch claude/nifty-edison-01274c) | done, not merged |
 | [0007](0007-self-hosting-plan.md) | Plan: self-hosted native GPLM, Go only for bootstrap | done |
 | [0008](0008-front-end.md) | Compiler front end in GPLM | done |
+| [0009](0009-native-back-end.md) | Native back end in GPLM; self-hosting fixpoint | done |
