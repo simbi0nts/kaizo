@@ -9,7 +9,7 @@ Evidence for the theory so far: 2 blind tests (v1: 0 fix rounds; v2 pending).
 The theory being tested (specs.md): an LLM-first language lets humans stay out of code and review.
 So every phase ends with a *measurement*, not just features.
 
-## Phase 0 — Consolidate — done in 0018 except CI (needs a GitHub remote)
+## Phase 0 — Consolidate — done (0016–0019; CI green on all four targets)
 - Push to GitHub, make CI green on real Windows/macOS runners; fix what they find.
 - Resolve open branches: 0006 (blind test v1), list_sort_by (renumber, rebuild seed), blind test v2 results.
 - Step-numbering protocol for parallel agents (reserve a number in STATUS.md before starting, or use
@@ -66,5 +66,5 @@ Exit: a non-trivial app (≥ 5k lines) shipped with zero human-written or human-
 - Docs: LANGUAGE.md stays the single source an agent needs; every step updates it.
 
 ## Suggested order for the next steps
-0016–0018 branch merges + rules (done) · 0019–0021 type checker · 0022 `kaizo eval` harness · then alternate
+0016–0019 Phase 0 (done) · 0020–0022 type checker · 0023 `kaizo eval` harness · then alternate
 measurement (Phase 2) with one feature track at a time (3 → 4 → 5).

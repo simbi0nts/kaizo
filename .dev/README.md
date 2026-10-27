@@ -62,4 +62,5 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0015](0015-demo3d.md) | 3D demo scene: software renderer in GPLM | done |
 | [0016](0016-format-experiment.md) | Experiment: GPLM text vs JSON AST vs raw x86 as agent output | done |
 | [0017](0017-list-sort-by.md) | list_sort_by: stable comparator sort | done |
-| [0018](0018-phase0-consolidation.md) | Phase 0: branches merged, step-number rule, CI ready | done (CI waits for a remote) |
+| [0018](0018-phase0-consolidation.md) | Phase 0: branches merged, step-number rule, CI ready | done |
+| [0019](0019-ci-real-hardware.md) | CI on real Windows/macOS: 2 bugs fixed, all 4 targets green | done |

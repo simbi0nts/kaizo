@@ -1,7 +1,7 @@
 # Current status
 
-Current step: 0018 done — Phase 0 consolidation (see ROADMAP.md)
-Next step:    0019 — static type checker (Phase 1); CI as soon as a GitHub remote exists
+Current step: 0019 done — Phase 0 complete: CI green on Linux, Windows, macOS arm64 and x86-64
+Next step:    0020 — static type checker (Phase 1)
 
 ## Reserved steps
 (none)
