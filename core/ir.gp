@@ -35,7 +35,10 @@ type Ins =
   | ICallM(Int, Int) | IJmpM(Int, Int) | ISys | ICopyB | ICopyQ | IEnter | ILeave(Int) | ITail(Int, Int)
   | IAddr(Int, String) | ILdG(Int, String) | IStG(String, Int) | ICall(String) | IJmp(String) | IJcc(Int, String)
   | ICCall(String, Int, Bool) | ICRaw(String) | ISxtw
+  | IAddM(Int, Int, Int) | IDecM(Int, Int) | IZeroQ | IRet
 end
+# IAddM(base, off, n): [base+off] += n · IDecM(base, off): [base+off] -= 1, flags from the result
+# IZeroQ: store rcx zero words at rdi (clobbers rax, rcx, rdi) · IRet: plain return
 
 # ---------- helpers with the names codegen uses (each returns a list of IR instructions) ----------
 

@@ -83,5 +83,5 @@ fn write_pe(o: Out) -> Image
     lebytes(0, 12), lebytes(0xC0000040, 4)])
   let head = str_from_bytes(le_all([dos, coff, opt, sec_text, sec_data]))
   let bytes = join_all(strs_from([head, zeros_str(sub(headers, str_len(head))), l.text, zeros_str(sub(text_raw, str_len(l.text))), l.data, zeros_str(sub(data_raw, str_len(l.data)))]))
-  Image { bytes: bytes, missing: l.missing }
+  Image { bytes: bytes, missing: l.missing, symmap: symbol_map(l) }
 end

@@ -7,7 +7,7 @@ fn param_env(params: List[String]) -> List[Bind]
 end
 
 fn static_closure(label: String, arity: Int) -> Code
-  cat([CLab(clo_label(label)), CB(lebytes(tag_clo, 8)), CA64(label), CB(lebytes(arity, 8))])
+  cat([obj_label(clo_label(label)), CB(lebytes(tag_clo, 8)), CA64(label), CB(lebytes(arity, 8))])
 end
 
 fn field_table(p: Program) -> Map[List[FIdx]]
@@ -38,7 +38,7 @@ fn gen_fns(cx: Cx, g: G, m: Module) -> G
     list_fold(f.fns, acc, fn(a2, fd)
       let l = fn_label(m.name, fd.name)
       let ps = list_map(fd.params, fn(p) p.name end)
-      let a3 = cg_function({ cx with mod: m }, a2, l, list_len(ps), param_env(ps), fd.body)
+      let a3 = cg_function({ cx with mod: m }, a2, l, ps, param_env(ps), fd.body)
       emit_data(a3, static_closure(l, list_len(ps)))
     end)
   end)
@@ -50,7 +50,7 @@ fn gen_init(cx: Cx, g: G) -> G
     list_fold(m.files, acc, fn(a2, f)
       list_fold(f.lets, a2, fn(a3, ld)
         let gl = str_join(["g:", m.name, ".", ld.name], "")
-        let a4 = cg({ cx with mod: m, nargs: 0 }, a3, [], ld.x, false)
+        let a4 = pop_frame(cx, cg({ cx with mod: m, nargs: 0 }, push_frame(a3, []), [], ld.x, false))
         emit_data(emit(a4, store_abs(gl, rax)), cat([CLab(gl), CB(lebytes(0, 8))]))
       end)
     end)
@@ -79,7 +79,7 @@ fn gen_wrapper(cx: Cx, g: G, w: String) -> G
   let callee = if is_ctor then ECtor(pos, name) else EVar(pos, name) end
   let body = [Stmt { pos: pos, let_name: "", x: ECall(pos, callee, list_map(params, fn(p) EVar(pos, p) end)) }]
   let l = str_cat("w:", w)
-  emit_data(cg_function({ cx with mod: rt }, g, l, arity, param_env(params), body), static_closure(l, arity))
+  emit_data(cg_function({ cx with mod: rt }, g, l, params, param_env(params), body), static_closure(l, arity))
 end
 
 fn table_arity(t: Map[Builtin]) -> Map[Int]
@@ -96,7 +96,7 @@ end
 # static list object holding the given words
 fn static_list(label: String, words: List[Code]) -> Code
   let n = list_len(words)
-  cat(list_concat([CLab(label), CB(lebytes(add(tag_list, mul(n, 256)), 8)), CA64(str_cat(label, ".d")), CLab(str_cat(label, ".d"))], words))
+  cat(list_concat([obj_label(label), CB(lebytes(add(tag_list, mul(n, 256)), 8)), CA64(str_cat(label, ".d")), CB(lebytes(0, 8)), CLab(str_cat(label, ".d"))], words))
 end
 
 fn gen_tables(g: G, p: Program) -> G
@@ -105,7 +105,7 @@ fn gen_tables(g: G, p: Program) -> G
     GW { g: s.g, words: list_push(acc.words, CA64(s.l)) }
   end)
   let objs = list_fold(p.ctor_list, CNil, fn(acc, c)
-    if eq(c.arity, 0) then CCat(acc, cat([CLab(ctor_label(c.name)), CB(list_concat(lebytes(tag_ctor, 8), lebytes(c.id, 8)))])) else acc end
+    if eq(c.arity, 0) then CCat(acc, cat([obj_label(ctor_label(c.name)), CB(list_concat(lebytes(tag_ctor, 8), lebytes(c.id, 8)))])) else acc end
   end)
   let g1 = emit_data(r1.g, CCat(cat(list_concat([CLab("t:ctor_names")], r1.words)), objs))
   let r2 = list_fold(p.record_list, GW { g: g1, words: [] }, fn(acc, td)
@@ -134,8 +134,9 @@ fn gen_runtime_data(g: G, t: Target) -> G
     cat([CLab("sigact"), CA64("sighandler"), CB(lebytes(0x4000000, 8)), CA64("sighandler"), CB(lebytes(0, 8)), CLab("sigign"), CB(lebytes(1, 32))])
   else CNil end
   emit_data(g, cat([sig,
-    CLab("TRUE"), CB(list_concat(lebytes(5, 8), lebytes(1, 8))),
-    CLab("FALSE"), CB(list_concat(lebytes(5, 8), lebytes(0, 8))),
+    obj_label("TRUE"), CB(list_concat(lebytes(5, 8), lebytes(1, 8))),
+    obj_label("FALSE"), CB(list_concat(lebytes(5, 8), lebytes(0, 8))),
+    CLab("freelists"), CB(lebytes(0, mul(8, 192))),
     CLab("g_argc"), CB(lebytes(0, 8)), CLab("g_argv"), CB(lebytes(0, 8)), CLab("g_envp"), CB(lebytes(0, 8)),
     CLab("termios_ptr"), CB(lebytes(0, 8)), CLab("sig_num"), CB(lebytes(0, 8)),
     CLab("heap_base"), CB(lebytes(0, 8)), CLab("heap_end"), CB(lebytes(0, 8)), CLab("ctrl_tmp"), CB(lebytes(0, 16)),
@@ -222,11 +223,11 @@ fn gen_tests(cx: Cx, g: G, path: String) -> G
   let m = get_module(cx.prog, main_module)
   let r = list_fold(m.tests, TG { g: g, k: 0, names: [], fns: [] }, fn(acc, t)
     let l = str_cat("test:", show(acc.k))
-    let g1 = emit_data(cg_function({ cx with mod: m }, acc.g, l, 0, [], t.body), static_closure(l, 0))
+    let g1 = emit_data(cg_function({ cx with mod: m }, acc.g, l, [], [], t.body), static_closure(l, 0))
     let s = str_lit(g1, t.name)
     TG { g: s.g, k: add(acc.k, 1), names: list_push(acc.names, CA64(s.l)), fns: list_push(acc.fns, CA64(clo_label(l))) }
   end)
-  emit_data(r.g, cat([static_list("t:test_names", r.names), static_list("t:test_fns", r.fns), CLab("t:test_path"), str_object(path)]))
+  emit_data(r.g, cat([static_list("t:test_names", r.names), static_list("t:test_fns", r.fns), obj_label("t:test_path"), str_object(path)]))
 end
 
 type TG = { g: G, k: Int, names: List[Code], fns: List[Code] } end
@@ -234,8 +235,8 @@ type TG = { g: G, k: Int, names: List[Code], fns: List[Code] } end
 type Out = { text: List[Blob], data: List[Blob], imports: List[String] } end
 
 fn gen_program(p: Program, embeds: Map[String], mode: Mode, t: Target) -> Out
-  let cx = Cx { prog: p, mod: get_module(p, main_module), nargs: 0, fields: field_table(p), rec_ids: record_ids(p), embeds: embeds, target: t }
-  let g0 = G { code: CNil, slot: 1, lab: 0, data: CLab("data_start"), funcs: [], wrappers: [], strs: map.empty(), imports: entry_imports(t) }
+  let cx = Cx { prog: p, mod: get_module(p, main_module), nargs: 0, fields: field_table(p), rec_ids: record_ids(p), embeds: embeds, target: t, ann: rc_empty(), lambda: false }
+  let g0 = G { code: CNil, slot: 1, lab: 0, data: CLab("data_start"), funcs: [], wrappers: [], strs: map.empty(), imports: entry_imports(t), pending: [] }
   let g1 = list_fold(p.order, g0, fn(acc, name) gen_fns(cx, acc, get_module(p, name)) end)
   let g2 = gen_init(cx, g1)
   let g3 = match mode
@@ -243,7 +244,7 @@ fn gen_program(p: Program, embeds: Map[String], mode: Mode, t: Target) -> Out
     case AppMode -> g2
   end
   let g4 = gen_runtime_data(gen_tables(gen_wrappers(cx, g3, []), p), t)
-  let text = list_map(list_concat(g4.funcs, entry_code(t, mode)), fn(c) assemble(t, c) end)
+  let text = list_map(list_concat(list_concat(g4.funcs, memory_code()), entry_code(t, mode)), fn(c) assemble(t, c) end)
   let data = assemble(t, g4.data)
   let rel = list_filter(data.fixups, fn(f) eq(f.kind, 2) end)
   let reloc = assemble(t, cat(list_concat([CLab("data_start_link"), CA64("data_start"), CLab("reloc_table"), CB(lebytes(list_len(rel), 8))],
@@ -292,4 +293,58 @@ fn start_macos(t: Target, mode: Mode) -> List[Code]
     CI([IMovI(a0, 0), IMovI(a1, 0), ICRaw("tcsetattr"), IMovI(a0, 1), IAddr(a1, "cursor_on"), IMovI(a2, 6), ICRaw("write")]),
     CLab(".sigskip"), CI([ILdG(a0, "sig_num"), IAluI(0, a0, 128), ICRaw("_exit")])])
   [start, handler]
+end
+
+# ---------- memory: allocation with size-class free lists, freeing ----------
+# A block is [count][object]; free blocks are linked through their first word.
+# Classes: block sizes 8..1024 in steps of 8 (index = size/8), larger ones rounded up to a power of
+# two (index 128 + k for 1024 << k). Every class has a free list in `freelists`.
+
+# rax = block size (multiple of 8) -> rcx = class index, rax = rounded block size (leaf, keeps rdx)
+fn class_code() -> Code
+  cat([CLab("rt_class"), CI([IAluI(7, rax, 1024)]), jcc(cc_g, ".cls_big"), CI([IMov(rcx, rax), IShI(5, rcx, 3), IRet]),
+    CLab(".cls_big"), CI([IPush(rdx), IMovI(rdx, 2048), IMovI(rcx, 129)]),
+    CLab(".cls_loop"), CI([IAlu(57, rdx, rax)]), jcc(cc_ge, ".cls_done"), CI([IShI(4, rdx, 1), IAluI(0, rcx, 1)]), jmp(".cls_loop"),
+    CLab(".cls_done"), CI([IMov(rax, rdx), IPop(rdx), IRet])])
+end
+
+# rax = object size -> rax = new object (count 1); keeps rcx, rdx, rsi, rdi
+fn alloc_code() -> Code
+  cat([CLab("rt_alloc"), CI([IPush(rcx), IPush(rdx), IAluI(0, rax, 8)]), call_l("rt_class"),
+    CI([IAddr(rdx, "freelists"), IShI(4, rcx, 3), IAlu(1, rdx, rcx), ILd(rcx, rdx, 0), IAlu(133, rcx, rcx)]), jcc(cc_e, ".al_bump"),
+    CI([IPush(rax), ILd(rax, rcx, 0), ISt(rdx, 0, rax), IPop(rax), IMov(rax, rcx)]), jmp(".al_init"),
+    CLab(".al_bump"), CI([IMov(rcx, r14), IAlu(1, r14, rax), IMov(rax, rcx)]),
+    CLab(".al_init"), CI([IMovI(rcx, 1), ISt(rax, 0, rcx), IAluI(0, rax, 8), IPop(rdx), IPop(rcx), IRet])])
+end
+
+# drop the value in rax (inside rt_free: may recurse)
+fn free_drop(skip: String) -> Code
+  cat([CI([ITst1(rax)]), jcc(cc_ne, skip), CI([IDecM(rax, -8)]), jcc(cc_ne, skip), call_l("rt_free"), CLab(skip)])
+end
+
+# rax = object whose count reached zero: drop what it refers to, put its block on a free list.
+# Frame: [rbp-16] object, [rbp-24] index, [rbp-32] count, [rbp-40] first child address, [rbp-48] size
+fn free_code() -> Code
+  cat([CLab("rt_free"), CI([IEnter, IAluI(5, rsp, 48), ISt(rbp, -16, rax), IMovI(rcx, 0), ISt(rbp, -24, rcx), ILdB(rcx, rax, 0), ILd(rdx, rax, 0), IShI(5, rdx, 8)]),
+    CI([IAluI(7, rcx, 1)]), jcc(cc_e, ".fr_str"), CI([IAluI(7, rcx, 2)]), jcc(cc_e, ".fr_list"),
+    CI([IAluI(7, rcx, 6)]), jcc(cc_e, ".fr_clo"), CI([IAluI(7, rcx, 7)]), jcc(cc_e, ".fr_handle"),
+    # record / constructor: fields at +16
+    CI([ISt(rbp, -32, rdx), ILea(rcx, rax, 16), ISt(rbp, -40, rcx), IShI(4, rdx, 3), IAluI(0, rdx, 16), ISt(rbp, -48, rdx)]), jmp(".fr_children"),
+    CLab(".fr_clo"), CI([ISt(rbp, -32, rdx), ILea(rcx, rax, 24), ISt(rbp, -40, rcx), IShI(4, rdx, 3), IAluI(0, rdx, 24), ISt(rbp, -48, rdx)]), jmp(".fr_children"),
+    CLab(".fr_handle"), CI([IMovI(rdx, 16), ISt(rbp, -48, rdx)]), jmp(".fr_release"),
+    CLab(".fr_str"), CI([IAluI(0, rdx, 15), IAluI(4, rdx, -8), ISt(rbp, -48, rdx)]), jmp(".fr_release"),
+    CLab(".fr_list"), CI([ILd(rcx, rax, 16), IAlu(133, rcx, rcx)]), jcc(cc_e, ".fr_base"),
+    CI([IMovI(rdx, 24), ISt(rbp, -48, rdx), IMov(rax, rcx)]), free_drop(".fr_owner"), jmp(".fr_release"),
+    CLab(".fr_base"), CI([ISt(rbp, -32, rdx), ILea(rcx, rax, 24), ISt(rbp, -40, rcx), IShI(4, rdx, 3), IAluI(0, rdx, 24), ISt(rbp, -48, rdx)]),
+    CLab(".fr_children"), CI([ILd(rcx, rbp, -24), ILd(rdx, rbp, -32), IAlu(57, rcx, rdx)]), jcc(cc_ge, ".fr_release"),
+    CI([ILd(rdx, rbp, -40), IShI(4, rcx, 3), IAlu(1, rdx, rcx), ILd(rax, rdx, 0), IAlu(133, rax, rax)]), jcc(cc_e, ".fr_next"),
+    free_drop(".fr_child"),
+    CLab(".fr_next"), CI([ILd(rcx, rbp, -24), IAluI(0, rcx, 1), ISt(rbp, -24, rcx)]), jmp(".fr_children"),
+    CLab(".fr_release"), CI([ILd(rax, rbp, -48), IAluI(0, rax, 8)]), call_l("rt_class"),
+    CI([IAddr(rdx, "freelists"), IShI(4, rcx, 3), IAlu(1, rdx, rcx), ILd(rax, rbp, -16), IMovI(rcx, 0xEE), ISt(rax, 0, rcx),
+      IAluI(5, rax, 8), ILd(rcx, rdx, 0), ISt(rax, 0, rcx), ISt(rdx, 0, rax), ILeave(0)])])
+end
+
+fn memory_code() -> List[Code]
+  [class_code(), alloc_code(), free_code()]
 end

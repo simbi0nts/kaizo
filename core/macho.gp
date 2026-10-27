@@ -103,5 +103,5 @@ fn write_macho(t: Target, o: Out) -> Image
   let file = join_all(strs_from([head, zeros_str(sub(4096, str_len(head))), l.text, zeros_str(sub(data_off, add(4096, str_len(l.text)))),
     l.data, zeros_str(sub(data_seg, str_len(l.data))), str_from_bytes(bind), str_from_bytes([32, 0, 0, 0, 0, 0, 0, 0]),
     zeros_str(sub(sig_off, add(str_off, 8)))]))
-  Image { bytes: str_cat(file, code_signature(file, ident, text_seg)), missing: l.missing }
+  Image { bytes: str_cat(file, code_signature(file, ident, text_seg)), missing: l.missing, symmap: symbol_map(l) }
 end

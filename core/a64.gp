@@ -221,6 +221,10 @@ fn lower_a64(t: Target, i: Ins) -> Code
     case ICCall(sym, n, r32) -> a_ccall(sym, n, r32)
     case ICRaw(sym) -> a_call_got(sym)
     case ISxtw -> words([0x93407C00])
+    case IAddM(b, o, n) -> words(list_concat(list_concat(a_ldst(false, x16, areg(b), o), a_addi(x16, x16, n)), a_ldst(true, x16, areg(b), o)))
+    case IDecM(b, o) -> words(list_concat(list_push(a_ldst(false, x16, areg(b), o), dp_imm(0xF1000000, x16, x16, 1)), a_ldst(true, x16, areg(b), o)))
+    case IZeroQ -> words([0xB4000081, 0xF800849F, dp_imm(0xD1000000, 1, 1, 1), 0x17FFFFFD])
+    case IRet -> words([0xD65F03C0])
   end
 end
 
@@ -392,6 +396,30 @@ end
 
 test "a64: add x0, x0 (lo12 base)"
   expect_eq([dp_imm(0x91000000, 0, 0, 0)], [0x91000000])
+end
+
+test "a64: zero-fill loop"
+  # cbz x1, +16 · str xzr, [x4], #8 · sub x1, x1, #1 · b -12
+  match lower_a64(Target { name: "macos-arm64", os: "macos", arch: "arm64" }, IZeroQ)
+    case CB(b) -> expect_eq(b, list_fold([0xB4000081, 0xF800849F, 0xD1000421, 0x17FFFFFD], [], fn(acc, x) list_concat(acc, lebytes(x, 4)) end))
+    case _ -> panic("not bytes")
+  end
+end
+
+test "a64: subs x16, x16, #1"
+  expect_eq(dp_imm(0xF1000000, 16, 16, 1), 0xF1000610)
+end
+
+test "a64: zero-fill loop"
+  # cbz x1, +16 · str xzr, [x4], #8 · sub x1, x1, #1 · b -12
+  match lower_a64(Target { name: "macos-arm64", os: "macos", arch: "arm64" }, IZeroQ)
+    case CB(b) -> expect_eq(b, list_fold([0xB4000081, 0xF800849F, 0xD1000421, 0x17FFFFFD], [], fn(acc, x) list_concat(acc, lebytes(x, 4)) end))
+    case _ -> panic("not bytes")
+  end
+end
+
+test "a64: subs x16, x16, #1"
+  expect_eq(dp_imm(0xF1000000, 16, 16, 1), 0xF1000610)
 end
 
 test "a64: byte copy loop"

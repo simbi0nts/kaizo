@@ -146,6 +146,13 @@ end
 
 # check + generate; None after printing errors
 fn compile(path: String, mode: Mode, t: Target) -> Option[String] ! [io, fs]
+  match compile_image(path, mode, t)
+    case Some(img) -> Some(img.bytes)
+    case None -> None
+  end
+end
+
+fn compile_image(path: String, mode: Mode, t: Target) -> Option[Image] ! [io, fs]
   match load(path, false, t)
     case None -> None
     case Some(prog) ->
@@ -158,7 +165,7 @@ fn compile(path: String, mode: Mode, t: Target) -> Option[String] ! [io, fs]
           if gt(list_len(img.missing), 0) then
             println(str_cat("internal error: unresolved symbols: ", str_join(list_slice(img.missing, 0, 10), ", ")))
             None
-          else Some(img.bytes) end
+          else Some(img) end
       end
   end
 end
@@ -169,9 +176,15 @@ fn cmd_build(rest: List[String]) -> Unit ! [io, fs]
       match flag_value(rest, "-o")
         case None -> fail_usage()
         case Some(out) ->
-          match compile(path, AppMode, target_arg(rest))
+          match compile_image(path, AppMode, target_arg(rest))
             case None -> exit(1)
-            case Some(bin) ->
+            case Some(img) ->
+              let bin = img.bytes
+              if list_contains(rest, "--map") then
+                match write_file(str_cat(out, ".map"), img.symmap, 420)
+                  case _ -> Unit
+                end
+              else Unit end
               match write_file(out, bin, 493)
                 case Ok(_) -> println(str_join(["built ", out, " (", show(str_len(bin)), " bytes)"], ""))
                 case Err(e) ->

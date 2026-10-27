@@ -160,5 +160,9 @@ fn lower_x64(t: Target, i: Ins) -> Code
     case ICCall(sym, n, r32) -> x_ccall(t, sym, n, r32)
     case ICRaw(sym) -> x_craw(t, sym)
     case ISxtw -> CB([72, 99, 192])
+    case IAddM(b, o, n) -> CB(cat3([rex(true, 0, 0, b), 129], mem(0, b, o), lebytes(n, 4)))
+    case IDecM(b, o) -> CB(cat3([rex(true, 0, 0, b), 129], mem(5, b, o), lebytes(1, 4)))
+    case IZeroQ -> CB(list_concat(x_movi(rax, 0), [0xF3, 0x48, 0xAB]))
+    case IRet -> CB([0xC3])
   end
 end

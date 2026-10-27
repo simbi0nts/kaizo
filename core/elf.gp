@@ -2,7 +2,21 @@
 
 let elf_base = 4194304
 
-type Image = { bytes: String, missing: List[String] } end
+type Image = { bytes: String, missing: List[String], symmap: String } end
+
+# "address name" lines, sorted by address (written with --map, for debuggers)
+fn symbol_map(l: LinkOut) -> String
+  let lines = list_map(map.entries(l.syms), fn(e) str_join([hex_addr(e.value), " ", e.key], "") end)
+  str_join(list_sort(lines), "\n")
+end
+
+fn hex_addr(n: Int) -> String
+  let digits = "0123456789abcdef"
+  str_join(list_map(list_reverse(list_range(0, 12)), fn(i)
+    let d = bit_and(bit_shr(n, mul(4, i)), 15)
+    str_slice(digits, d, add(d, 1))
+  end), "")
+end
 
 fn le_all(parts: List[List[Int]]) -> List[Int]
   list_fold(parts, [], fn(acc, p) list_concat(acc, p) end)
@@ -20,7 +34,7 @@ fn write_elf(o: Out) -> Image
     lebytes(str_len(l.data), 8), lebytes(str_len(l.data), 8), lebytes(4096, 8)])
   let head = str_from_bytes(le_all([eh, ph_text, ph_data]))
   let bytes = join_all(strs_from([head, zeros_str(sub(4096, str_len(head))), l.text, zeros_str(sub(data_off, text_end)), l.data]))
-  Image { bytes: bytes, missing: l.missing }
+  Image { bytes: bytes, missing: l.missing, symmap: symbol_map(l) }
 end
 
 fn strs_from(l: List[String]) -> Strs
