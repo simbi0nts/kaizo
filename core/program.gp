@@ -48,7 +48,7 @@ let builtin_list = [
   b("str_repeat", 2, ""), b("str_lower", 1, ""), b("str_to_int", 1, ""), b("str_byte", 2, ""), b("str_from_bytes", 1, ""),
   b("list_len", 1, ""), b("list_get", 2, ""), b("list_cons", 2, ""), b("list_push", 2, ""), b("list_concat", 2, ""),
   b("list_slice", 3, ""), b("list_reverse", 1, ""), b("list_range", 2, ""), b("list_contains", 2, ""),
-  b("list_map", 2, ""), b("list_filter", 2, ""), b("list_fold", 3, ""), b("list_sort", 1, ""),
+  b("list_map", 2, ""), b("list_filter", 2, ""), b("list_fold", 3, ""), b("list_sort", 1, ""), b("list_sort_by", 2, ""),
   b("panic", 1, ""), b("expect", 2, ""), b("expect_eq", 2, ""), b("embed_file", 1, ""),
   b("print", 1, "io"), b("println", 1, "io"), b("read_line", 0, "io"), b("args", 0, "io"), b("exit", 1, "io"), b("env_get", 1, "io"),
   b("term_raw", 0, "term"), b("term_restore", 0, "term"), b("term_key", 0, "term"),

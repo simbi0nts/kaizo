@@ -68,6 +68,24 @@ test "lambdas capture"
   expect_eq(list_filter(list_range(0, 10), fn(x) eq(mod(x, 3), 0) end), [0, 3, 6, 9])
 end
 
+test "list_sort_by: stable, empty, large"
+  let byk = fn(a, b) lt(a.x, b.x) end
+  let ps = [Pt { x: 2, y: 0 }, Pt { x: 1, y: 1 }, Pt { x: 2, y: 2 }, Pt { x: 1, y: 3 }, Pt { x: 0, y: 4 }]
+  expect_eq(list_map(list_sort_by(ps, byk), fn(p) p.y end), [4, 1, 3, 0, 2])
+  expect_eq(list_sort_by([], fn(a, b) lt(a, b) end), [])
+  expect_eq(list_sort_by([5], fn(a, b) lt(a, b) end), [5])
+  expect_eq(list_sort_by(["b", "c", "a"], fn(a, b) gt(a, b) end), ["c", "b", "a"])
+  let big = list_map(list_range(0, 10000), fn(i) Pt { x: mod(mul(i, 7919), 100), y: i } end)
+  let s = list_sort_by(big, byk)
+  expect_eq(list_len(s), 10000)
+  let ok = list_fold(list_range(1, 10000), true, fn(acc, i)
+    let p = unwrap_or(list_get(s, sub(i, 1)), origin)
+    let q = unwrap_or(list_get(s, i), origin)
+    and(acc, or(lt(p.x, q.x), and(eq(p.x, q.x), lt(p.y, q.y))))
+  end)
+  expect(ok, "10k sorted by x, ties in input order")
+end
+
 test "strings"
   expect_eq(str_split("a,b,,c", ","), ["a", "b", "", "c"])
   expect_eq(str_find("hello", "ll"), Some(2))
