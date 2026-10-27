@@ -38,3 +38,4 @@ Status: done | in progress | proposal (waiting for human decision)
 | [0003](0003-core-v0.md) | Core v0: interpreter, checker, run/check/test/build | done |
 | [0004](0004-snake.md) | Test project 1: Snake | done |
 | [0005](0005-hello-web.md) | Test project 2a: Hello web | done |
+| [0006](0006-blind-test.md) | Blind usability test: todo-cli | done |

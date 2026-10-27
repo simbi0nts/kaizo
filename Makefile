@@ -8,7 +8,7 @@ core:
 	cd core && go build -o ../$(KAIZO) .
 
 test: core
-	$(KAIZO) test core/selftest.gp libs/rand libs/http apps/snake/main.gp apps/hello-web/main.gp
+	$(KAIZO) test core/selftest.gp libs/rand libs/http apps/snake/main.gp apps/hello-web/main.gp apps/todo-cli/main.gp
 
 e2e: core
 	./tests/e2e.sh
