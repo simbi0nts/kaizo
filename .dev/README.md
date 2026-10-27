@@ -66,3 +66,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0019](0019-ci-real-hardware.md) | CI on real Windows/macOS: 2 bugs fixed, all 4 targets green | done |
 | [0020](0020-type-checker.md) | Static type checker: inference, generics, records | done |
 | [0021](0021-effect-types.md) | Function types carry effects | done |
+| [0022](0022-phase1-exit.md) | Phase 1 exit: blind-test mistakes now all caught before run time | done |

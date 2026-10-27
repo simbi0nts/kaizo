@@ -15,6 +15,8 @@ test: core
 	@for s in $(SUITES); do $(KAIZO) test $$s || exit 1; done
 	@./tests/type_errors.sh $(KAIZO) > build/type_errors.log || { cat build/type_errors.log; exit 1; }
 	@echo "type errors: $$(grep -c PASS build/type_errors.log) wrong programs rejected as expected"
+	@./tests/mutations.sh $(KAIZO) > build/mutations.log || { cat build/mutations.log; exit 1; }
+	@echo "blind-test mistakes: $$(grep -c PASS build/mutations.log) of 3 that used to reach run time are now rejected by kaizo check"
 
 # the core must reproduce itself byte for byte
 selfhost: core

@@ -16,7 +16,7 @@ So every phase ends with a *measurement*, not just features.
   `NNNN-branch` ids) — two sessions already collided on 0013.
 Exit: CI green on 4 targets; one linear history; no orphan branches.
 
-## Phase 1 — Make the checker catch what LLMs get wrong (3–5 steps)
+## Phase 1 — Make the checker catch what LLMs get wrong — done (0020–0022)
 - Static type checker with inference: generics, records, ADTs, `Fn` types **with effects**
   (closes the handler-effect hole), no annotations beyond today's signatures.
 - Consequences: runtime type errors become compile errors; RC skips Int values (speed); better hints.
@@ -66,5 +66,5 @@ Exit: a non-trivial app (≥ 5k lines) shipped with zero human-written or human-
 - Docs: LANGUAGE.md stays the single source an agent needs; every step updates it.
 
 ## Suggested order for the next steps
-0016–0019 Phase 0 (done) · 0020–0022 type checker · 0023 `kaizo eval` harness · then alternate
+0016–0019 Phase 0 (done) · 0020–0022 type checker (done) · 0023 `kaizo eval` harness · then alternate
 measurement (Phase 2) with one feature track at a time (3 → 4 → 5).

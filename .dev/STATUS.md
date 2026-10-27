@@ -1,10 +1,10 @@
 # Current status
 
-Current step: 0021 done — static types incl. effects of function values
-Next step:    0022 — use the types (RC skips Int), docs
+Current step: 0022 done — Phase 1 complete (static types + effect types; exit criterion met)
+Next step:    0023 — `kaizo eval` harness (Phase 2)
 
 ## Reserved steps
-0022 — use the types: RC skips Int values, docs (this session)
+(none)
 
 ## Quick check
 ```
