@@ -6,9 +6,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: seed builds the core, all suites
-        run: make all
+        run: |
+          set -o pipefail
+          make all 2>&1 | tee all.log
+      - name: summary
+        if: always()
+        run: |
+          { echo "### linux"; echo '```'; tail -c 30000 all.log 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: self-hosting fixpoint
         run: make selfhost
       - name: end-to-end (snake pty, hello-web http)
@@ -42,11 +48,18 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
         with:
           name: kaizo-dist
           path: dist
       - run: chmod +x dist/* || true
       - name: platform checks
-        run: tests/ci_platform.sh dist/${{ matrix.bin }} ${{ matrix.target }} dist
+        run: |
+          set +e
+          mkdir -p out
+          tests/ci_platform.sh dist/${{ matrix.bin }} ${{ matrix.target }} dist 2>&1 | tee out/ci.log
+          status=${PIPESTATUS[0]}
+          # the job summary is readable without signing in (step logs are not)
+          { echo "### ${{ matrix.target }}: exit $status"; echo '```'; tail -c 60000 out/ci.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
