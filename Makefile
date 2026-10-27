@@ -8,7 +8,7 @@ core:
 	cd bootstrap && go build -o ../$(KAIZO) .
 
 test: core
-	$(KAIZO) test core/selftest.gp libs/rand libs/http libs/map apps/snake/main.gp apps/hello-web/main.gp
+	$(KAIZO) test tests/selftest.gp libs/rand libs/http libs/map apps/snake/main.gp apps/hello-web/main.gp
 
 e2e: core
 	./tests/e2e.sh
