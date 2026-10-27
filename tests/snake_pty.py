@@ -46,5 +46,5 @@ out, st, before, after = run(app, [], sig=signal.SIGINT)
 good &= check("Ctrl+C restores terminal", before[3] == after[3])
 
 out, st, before, after = run(app + ["--tick", "20"], [], wait=1.5)
-good &= check("snake dies at the wall on its own", "Game over. Score: 0" in out, out[-200:])
+good &= check("snake dies at the wall on its own", "Game over. Score:" in out, out[-200:])  # food may lie on its path
 sys.exit(0 if good else 1)
