@@ -1,0 +1,14 @@
+add main apple 0
+add main apple -1
+add Main apple 1
+add main apple
+add main apple 1 2
+fly away
+move apple 1 main main
+report now
+  report
+report
+remove main ghost 1
+total
+add main apple 01
+report

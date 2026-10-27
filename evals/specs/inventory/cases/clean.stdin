@@ -1,0 +1,10 @@
+# setup
+add a x 1
+
+add b x 2
+remove b x 2
+report
+total x
+total y
+move x 1 a b
+report

@@ -1,0 +1,6 @@
+add main apple 5
+add main pear 2
+move apple 3 main shop
+remove shop apple 4
+total apple
+report
