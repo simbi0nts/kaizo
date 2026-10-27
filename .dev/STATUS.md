@@ -1,7 +1,7 @@
 # Current status
 
-Current step: 0003 done
-Next step:    0004 — Snake + libs/rand
+Current step: 0004 done (Snake passes)
+Next step:    0005 — hello-web + libs/http
 
 ## Toolchain
 Go >= 1.22 (stdlib only), make. `make core` builds build/kaizo. Origin machine had:
