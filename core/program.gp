@@ -26,6 +26,7 @@ let builtin_list = [
   b("add", 2, ""), b("sub", 2, ""), b("mul", 2, ""), b("div", 2, ""), b("mod", 2, ""),
   b("eq", 2, ""), b("ne", 2, ""), b("lt", 2, ""), b("le", 2, ""), b("gt", 2, ""), b("ge", 2, ""),
   b("not", 1, ""), b("and", 2, ""), b("or", 2, ""),
+  b("bit_and", 2, ""), b("bit_or", 2, ""), b("bit_xor", 2, ""), b("bit_shl", 2, ""), b("bit_shr", 2, ""), b("target", 0, ""),
   b("show", 1, ""), b("str_cat", 2, ""), b("str_join", 2, ""), b("str_len", 1, ""), b("str_slice", 3, ""),
   b("str_find", 2, ""), b("str_split", 2, ""), b("str_trim", 1, ""), b("str_starts", 2, ""), b("str_ends", 2, ""),
   b("str_repeat", 2, ""), b("str_lower", 1, ""), b("str_to_int", 1, ""), b("str_byte", 2, ""), b("str_from_bytes", 1, ""),

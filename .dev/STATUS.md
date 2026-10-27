@@ -1,7 +1,7 @@
 # Current status
 
-Current step: 0010 done — GPLM is self-hosted and native; no host language in the repo
-Next step:    not chosen (see "Proposed next steps")
+Current step: 0011 — cross-platform work, phase A done
+Next step:    0011 phase B — IR, PIC, OS-layer split (Linux)
 
 ## Quick check
 ```

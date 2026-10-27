@@ -22,7 +22,8 @@ type GL = { g: G, l: String } end
 type GS = { g: G, s: Int } end
 type GE = { g: G, env: List[Bind] } end
 
-let inline_builtins = ["add", "sub", "mul", "div", "mod", "eq", "ne", "lt", "le", "gt", "ge", "not", "and", "or"]
+let inline_builtins = ["add", "sub", "mul", "div", "mod", "eq", "ne", "lt", "le", "gt", "ge", "not", "and", "or",
+  "bit_and", "bit_or", "bit_xor", "bit_shl", "bit_shr", "target"]
 let located_builtins = ["panic", "expect", "expect_eq"]
 
 fn tagged(n: Int) -> Int
@@ -670,6 +671,18 @@ fn cg_inline(cx: Cx, g: G, env: List[Bind], pos: Pos, name: String, args: List[E
     let g1 = check_bool(check_bool(args2(cx, g, env, args), rcx, pos, str_cat(name, ": arguments must be Bool")), rax, pos, str_cat(name, ": arguments must be Bool"))
     let keep = new_label(g1)
     emit(keep.g, cat([mov_addr(rdx, if eq(name, "and") then "FALSE" else "TRUE" end), CB(op_rr(57, rcx, rdx)), jcc(cc_ne, keep.l), CB(mov_rr(rax, rdx)), CLab(keep.l)]))
+  elif eq(name, "bit_and") then eb(check_ints(args2(cx, g, env, args), pos, name), op_rr(33, rax, rcx))
+  elif eq(name, "bit_or") then eb(check_ints(args2(cx, g, env, args), pos, name), op_rr(9, rax, rcx))
+  elif eq(name, "bit_xor") then eb(check_ints(args2(cx, g, env, args), pos, name), list_concat(op_rr(49, rax, rcx), alu_imm(1, rax, 1)))
+  elif eq(name, "bit_shl") then
+    eb(check_ints(args2(cx, g, env, args), pos, name), list_concat(list_concat(list_concat(mov_rr(r8, rax), shift(7, r8, 1)), list_concat(mov_rr(rax, rcx), alu_imm(5, rax, 1))),
+      list_concat(list_concat(mov_rr(rcx, r8), shift_cl(4, rax)), alu_imm(1, rax, 1))))
+  elif eq(name, "bit_shr") then
+    eb(check_ints(args2(cx, g, env, args), pos, name), list_concat(list_concat(list_concat(mov_rr(r8, rax), shift(7, r8, 1)), list_concat(mov_rr(rax, rcx), shift(7, rax, 1))),
+      list_concat(list_concat(mov_rr(rcx, r8), shift_cl(7, rax)), tag_rax())))
+  elif eq(name, "target") then
+    let r = str_lit(g, "linux-x64")
+    emit(r.g, mov_addr(rax, r.l))
   else cg_prim(cx, g, env, pos, name, args)
   end
 end

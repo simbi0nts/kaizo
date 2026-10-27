@@ -77,3 +77,14 @@ test "strings"
   expect_eq(unwrap_or(str_to_int("x"), -1), -1)
   expect_eq(show([Some("a"), None]), "[Some(\"a\"), None]")
 end
+
+test "bit operations"
+  expect_eq(bit_and(12, 10), 8)
+  expect_eq(bit_or(12, 10), 14)
+  expect_eq(bit_xor(12, 10), 6)
+  expect_eq(bit_shl(1, 40), 1099511627776)
+  expect_eq(bit_shr(-16, 2), -4)
+  expect_eq(bit_and(-1, 4294967295), 4294967295)
+  expect_eq(list_map([1, 2], fn(x) bit_shl(x, 3) end), [8, 16])
+  expect(ne(target(), ""), "target is known")
+end

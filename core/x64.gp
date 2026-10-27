@@ -98,6 +98,11 @@ fn shift(ext: Int, r: Int, n: Int) -> List[Int]
   [rex(true, 0, 0, r), 193, modrm(3, ext, r), n]
 end
 
+# shift r by cl; ext: 4 shl, 5 shr, 7 sar
+fn shift_cl(ext: Int, r: Int) -> List[Int]
+  [rex(true, 0, 0, r), 211, modrm(3, ext, r)]
+end
+
 fn push_r(r: Int) -> List[Int]
   if ge(r, 8) then [65, add(80, mod(r, 8))] else [add(80, r)] end
 end

@@ -43,3 +43,4 @@ Status: done | in progress | proposal (waiting for human decision)
 | [0008](0008-front-end.md) | Compiler front end in GPLM | done |
 | [0009](0009-native-back-end.md) | Native back end in GPLM; self-hosting fixpoint | done |
 | [0010](0010-remove-go.md) | Go removed; both test projects pass on the native core | done |
+| [0011](0011-cross-platform-plan.md) | Plan: Windows/macOS targets; phase A (bit ops, target(), seed) | done |
