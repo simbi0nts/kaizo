@@ -1,7 +1,7 @@
 # Current status
 
-Current step: 0012 done — hex Int literals (`0x1F`); targets linux-x64, windows-x64, macos-x64, macos-arm64 (0011, awaiting CI)
-Next step:    run CI on GitHub (needs a remote), fix whatever the real Windows/macOS runners report
+Current step: 0013 done — reference counting: memory is freed (servers flat, self-compile 67 MB)
+Next step:    run CI on GitHub; then the static type checker
 
 ## Quick check
 ```
@@ -15,7 +15,6 @@ make e2e        # standalone Snake + Hello web end-to-end
 `.github/workflows/ci.yml` (Linux cross-builds; Windows/macOS runners run `tests/ci_platform.sh`).
 
 ## Proposed next steps (human picks)
-1. Garbage collector (needed for long-running servers).
 2. Static type checker (closes the gaps found by the blind test, step 0006 branch).
 3. Repeat the blind test against the native core.
 4. 2b mini text browser; content-hash lockfile for libraries.

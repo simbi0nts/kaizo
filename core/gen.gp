@@ -45,7 +45,7 @@ fn gen_fns(cx: Cx, g: G, m: Module) -> G
 end
 
 fn gen_init(cx: Cx, g: G) -> G
-  let body = list_fold(cx.prog.order, { g with code: CNil, slot: 1 }, fn(acc, name)
+  let body = list_fold(cx.prog.order, { g with code: CNil, slot: 1, temps: [] }, fn(acc, name)
     let m = get_module(cx.prog, name)
     list_fold(m.files, acc, fn(a2, f)
       list_fold(f.lets, a2, fn(a3, ld)
@@ -55,7 +55,7 @@ fn gen_init(cx: Cx, g: G) -> G
       end)
     end)
   end)
-  let f = cat([CLab("init"), CI([IEnter, IAluI(5, rsp, mul(8, body.slot))]), body.code, CI([ILeave(0)])])
+  let f = cat([CLab("init"), CI(list_concat([IEnter, IAluI(5, rsp, mul(8, body.slot))], temp_init(body.temps))), body.code, CI([ILeave(0)])])
   { body with funcs: list_push(body.funcs, f), code: g.code, slot: g.slot }
 end
 
@@ -236,7 +236,7 @@ type Out = { text: List[Blob], data: List[Blob], imports: List[String] } end
 
 fn gen_program(p: Program, embeds: Map[String], mode: Mode, t: Target) -> Out
   let cx = Cx { prog: p, mod: get_module(p, main_module), nargs: 0, fields: field_table(p), rec_ids: record_ids(p), embeds: embeds, target: t, ann: rc_empty(), lambda: false }
-  let g0 = G { code: CNil, slot: 1, lab: 0, data: CLab("data_start"), funcs: [], wrappers: [], strs: map.empty(), imports: entry_imports(t), pending: [] }
+  let g0 = G { code: CNil, slot: 1, lab: 0, data: CLab("data_start"), funcs: [], wrappers: [], strs: map.empty(), imports: entry_imports(t), pending: [], temps: [] }
   let g1 = list_fold(p.order, g0, fn(acc, name) gen_fns(cx, acc, get_module(p, name)) end)
   let g2 = gen_init(cx, g1)
   let g3 = match mode
@@ -342,9 +342,13 @@ fn free_code() -> Code
     CLab(".fr_next"), CI([ILd(rcx, rbp, -24), IAluI(0, rcx, 1), ISt(rbp, -24, rcx)]), jmp(".fr_children"),
     CLab(".fr_release"), CI([ILd(rax, rbp, -48), IAluI(0, rax, 8)]), call_l("rt_class"),
     CI([IAddr(rdx, "freelists"), IShI(4, rcx, 3), IAlu(1, rdx, rcx), ILd(rax, rbp, -16), IMovI(rcx, 0xEE), ISt(rax, 0, rcx),
-      IAluI(5, rax, 8), ILd(rcx, rdx, 0), ISt(rax, 0, rcx), ISt(rdx, 0, rax), ILeave(0)])])
+      IAluI(5, rax, 8), ILd(rcx, rdx, 0)]), if rc_debug then CNil else CI([ISt(rax, 0, rcx), ISt(rdx, 0, rax)]) end, CI([ILeave(0)])])
+end
+
+fn poison_code() -> Code
+  cat([CLab("rt_poison"), CI([IMovI(rax, 0), ILd(rax, rax, 0), IRet])])
 end
 
 fn memory_code() -> List[Code]
-  [class_code(), alloc_code(), free_code()]
+  [class_code(), alloc_code(), free_code(), poison_code()]
 end

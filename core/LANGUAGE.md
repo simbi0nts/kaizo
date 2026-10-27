@@ -113,7 +113,7 @@ Types and constructors are global (no two modules may define the same name).
 ## Known gaps of v1 (do not rely on them)
 - No static types yet: a wrong-typed argument fails at run time (with file:line:col for
   operators, field access and calls; errors inside library builtins name the builtin only).
-- No garbage collector yet: memory is only freed when the program exits.
+- Memory is managed automatically (reference counting inferred by the compiler, step 0013); nothing to write.
 - Targets: Linux x86-64, Windows x64, macOS x86-64 and arm64.
 - Effects passed through function values (e.g. a handler argument) are not tracked.
 - A local `let` lambda cannot call itself; write a top-level fn for recursion.

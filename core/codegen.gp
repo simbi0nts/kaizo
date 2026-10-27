@@ -20,7 +20,7 @@ type Loc = LSlot(Int) | LArg(Int) | LCap(Int) end
 type Bind = { name: String, loc: Loc } end
 type FIdx = { id: Int, idx: Int } end
 type Cx = { prog: Program, mod: Module, nargs: Int, fields: Map[List[FIdx]], rec_ids: Map[Int], embeds: Map[String], target: Target, ann: RcAnn, lambda: Bool } end
-type G = { code: Code, slot: Int, lab: Int, data: Code, funcs: List[Code], wrappers: List[String], strs: Map[String], imports: List[String], pending: List[List[Loc]] } end
+type G = { code: Code, slot: Int, lab: Int, data: Code, funcs: List[Code], wrappers: List[String], strs: Map[String], imports: List[String], pending: List[List[Loc]], temps: List[Int] } end
 type GL = { g: G, l: String } end
 type GS = { g: G, s: Int } end
 type View = { name: String, slot: Int, src: Int, k: Int } end
@@ -143,16 +143,23 @@ fn alloc_fixed(g: G, size: Int) -> G
   emit(g, cat([CI([IMovI(rax, size)]), call_l("rt_alloc")]))
 end
 
+# debug: trap on count updates of freed objects (freed blocks are then never reused)
+let rc_debug = false
+
 # count + 1 on the value in r (rax/rcx/rdx), if it is an object
 fn dup_reg(g: G, r: Int) -> G
   let skip = new_label(g)
-  emit(skip.g, cat([CI([ITst1(r)]), jcc(cc_ne, skip.l), CI([IAddM(r, -8, 1)]), CLab(skip.l)]))
+  let ok = new_label(skip.g)
+  let chk = if rc_debug then cat([CI([ICmpBM(r, 0, 0xEE)]), jcc(cc_ne, ok.l), call_l("rt_poison"), CLab(ok.l)]) else CNil end
+  emit(ok.g, cat([CI([ITst1(r)]), jcc(cc_ne, skip.l), chk, CI([IAddM(r, -8, 1)]), CLab(skip.l)]))
 end
 
 # count - 1 on the value in rax; frees it at zero (clobbers registers)
 fn drop_rax(g: G) -> G
   let skip = new_label(g)
-  emit(skip.g, cat([CI([ITst1(rax)]), jcc(cc_ne, skip.l), CI([IDecM(rax, -8)]), jcc(cc_ne, skip.l), call_l("rt_free"), CLab(skip.l)]))
+  let ok = new_label(skip.g)
+  let chk = if rc_debug then cat([CI([ICmpBM(rax, 0, 0xEE)]), jcc(cc_ne, ok.l), call_l("rt_poison"), CLab(ok.l)]) else CNil end
+  emit(ok.g, cat([CI([ITst1(rax)]), jcc(cc_ne, skip.l), chk, CI([IDecM(rax, -8)]), jcc(cc_ne, skip.l), call_l("rt_free"), CLab(skip.l)]))
 end
 
 fn owned_loc(loc: Loc) -> Bool
@@ -222,9 +229,16 @@ fn cg_borrow(cx: Cx, g: G, env: List[Bind], e: Expr) -> G
   end
 end
 
+# temporaries may be dropped on paths that never computed them (e.g. an elif condition),
+# so their slots start as Int 0 (see temp_init)
 fn keep_temp(g: G) -> G
   let sl = new_slot(g)
-  add_pending(eb(sl.g, store(rbp, slot_disp(sl.s), rax)), LSlot(sl.s))
+  let g1 = { sl.g with temps: list_push(sl.g.temps, sl.s) }
+  add_pending(eb(g1, store(rbp, slot_disp(sl.s), rax)), LSlot(sl.s))
+end
+
+fn temp_init(temps: List[Int]) -> List[Ins]
+  if eq(list_len(temps), 0) then [] else list_cons(IMovI(rax, 1), list_map(temps, fn(t) ISt(rbp, slot_disp(t), rax) end)) end
 end
 
 # runtime error at pos: push message, call rt fail (never returns)
@@ -737,15 +751,15 @@ fn cg_function(cx: Cx, g: G, label: String, params: List[String], env: List[Bind
   let nparams = list_len(params)
   let rc = rc_function(params, body)
   let cx2 = { cx with nargs: nparams, ann: rc.ann }
-  let g0 = { g with code: CNil, slot: 1, pending: [] }
+  let g0 = { g with code: CNil, slot: 1, pending: [], temps: [] }
   let g0b = drop_locs(cx2, g0, names_locs(env, rc.param_drops))
   let g1 = cg_block(cx2, g0b, env, body, true)
   let g2 = if cx.lambda then eb(drop_rax(eb(eb(g1, push_r(rax)), ldm(rax, rbp, -8))), pop_r(rax)) else g1 end
   let frame = mul(8, g2.slot)
-  let prologue = [IEnter, IAluI(5, rsp, frame), ISt(rbp, -8, r15)]
+  let prologue = list_concat([IEnter, IAluI(5, rsp, frame), ISt(rbp, -8, r15)], temp_init(g2.temps))
   let epilogue = [ILeave(mul(8, nparams))]
   let f = cat([CLab(label), CI(prologue), g2.code, CI(epilogue)])
-  { g2 with funcs: list_push(g2.funcs, f), code: g.code, slot: g.slot, pending: g.pending }
+  { g2 with funcs: list_push(g2.funcs, f), code: g.code, slot: g.slot, pending: g.pending, temps: g.temps }
 end
 
 # ---------- inline builtins and intrinsics ----------
