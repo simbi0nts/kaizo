@@ -75,6 +75,8 @@ Blocks (bodies of fn/test/if/case/lambda) are a sequence of statements:
 Pure:
 - Int: `add sub mul div mod` (div/mod are Euclidean: `mod(-7, 3) = 2`)
 - Compare: `eq ne` (deep, any values) · `lt le gt ge` (Int or String) · Bool: `not and or`
+- Bits: `bit_and bit_or bit_xor` · `bit_shl(x, n)` · `bit_shr(x, n)` (arithmetic) · `target()` → the
+  compile target, e.g. `"linux-x64"`, `"windows-x64"`, `"macos-x64"`, `"macos-arm64"`
 - Text: `show(v) -> String` (strings unchanged, others printed) · `str_cat(a, b)` ·
   `str_join(list, sep)` · `str_len(s)` (bytes) · `str_slice(s, from, to)` ·
   `str_find(s, sub) -> Option[Int]` · `str_split(s, sep) -> List[String]` · `str_trim` ·
@@ -111,7 +113,7 @@ Types and constructors are global (no two modules may define the same name).
 - No static types yet: a wrong-typed argument fails at run time (with file:line:col for
   operators, field access and calls; errors inside library builtins name the builtin only).
 - No garbage collector yet: memory is only freed when the program exits.
-- Native target: Linux x86-64 only.
+- Targets: Linux x86-64, Windows x64, macOS x86-64 and arm64. No hex literals yet (write decimal).
 - Effects passed through function values (e.g. a handler argument) are not tracked.
 - A local `let` lambda cannot call itself; write a top-level fn for recursion.
 
@@ -120,5 +122,6 @@ Types and constructors are global (no two modules may define the same name).
 kaizo check app.gp [--json]     # diagnostics with file/line/col/message/hint
 kaizo test  app.gp              # each test runs in its own process
 kaizo run   app.gp [args...]    # compiles to native code in memory and runs it
-kaizo build app.gp -o app       # static native executable (no libc, no dependencies)
+kaizo build app.gp -o app       # native executable for this OS (Linux: no libc at all)
+kaizo build app.gp -o app.exe --target windows-x64    # cross-compile: windows-x64, macos-x64, macos-arm64, linux-x64
 ```

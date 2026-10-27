@@ -1,0 +1,52 @@
+name: ci
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: seed builds the core, all suites
+        run: make all
+      - name: self-hosting fixpoint
+        run: make selfhost
+      - name: end-to-end (snake pty, hello-web http)
+        run: make e2e
+      - name: cross-build kaizo for every target
+        run: |
+          mkdir -p dist
+          cp build/kaizo dist/kaizo-linux-x64
+          build/kaizo build core -o dist/kaizo-windows-x64.exe --target windows-x64
+          build/kaizo build core -o dist/kaizo-macos-x64 --target macos-x64
+          build/kaizo build core -o dist/kaizo-macos-arm64 --target macos-arm64
+          python3 tests/macho_check.py dist/kaizo-macos-x64 dist/kaizo-macos-arm64
+          objdump -p dist/kaizo-windows-x64.exe | grep -E "DLL Name|Subsystem"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kaizo-dist
+          path: dist/
+
+  native:
+    needs: linux
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: windows-x64, bin: kaizo-windows-x64.exe }
+          - { os: macos-latest, target: macos-arm64, bin: kaizo-macos-arm64 }
+          - { os: macos-15-intel, target: macos-x64, bin: kaizo-macos-x64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: kaizo-dist
+          path: dist
+      - run: chmod +x dist/* || true
+      - name: platform checks
+        run: tests/ci_platform.sh dist/${{ matrix.bin }} ${{ matrix.target }} dist

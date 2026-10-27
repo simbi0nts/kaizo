@@ -1,6 +1,6 @@
 # Step 0011 — Plan: Windows x64, macOS x86-64, macOS arm64
 Date: 2026-10-27
-Status: plan + phase A done
+Status: implemented (A–F); Windows/macOS verified only structurally until CI runs on GitHub
 
 ## Human request
 "Make sure kaizo is compilable on other OS (macOS, Windows)." Chosen: Windows x64, macOS arm64,
@@ -44,3 +44,29 @@ F. CI workflow, docs. Needs the human to create a GitHub repo and push.
 
 ## Local verification limits
 No Wine/macOS/arm64 tools here (objdump knows only x86 + PE). macOS and arm64 are proven only on CI.
+
+## Results (phases A–F)
+| Phase | What | Local evidence |
+|---|---|---|
+| A | `bit_*`, `target()`; seed upgraded first so the compiler may use them | selftest |
+| B | IR (`ir.gp`), x86 lowering (`x64.gp`), assembler/linker (`link.gp`), ELF with RX/RW segments (`elf.gp`), PIC, self-relocation, `os_linux.gp` | all suites, fixpoint, e2e 13/13 |
+| C | Windows: `pe.gp`, `os_windows.gp`, Win64 calls, VEH heap commit, Ctrl+C handler, test re-exec | `objdump -p`: valid PE32+, 39 imports from kernel32/ws2_32; entry calls land on IAT slots |
+| D | macOS x86-64: `macho.gp`, dyld bind opcodes, ad-hoc code signature, `libs/sha256`, `os_macos.gp` | `tests/macho_check.py`: structure + all 245 page hashes match hashlib |
+| E | arm64: `a64.gp` (x26 value stack keeps the frame layout), macOS arm64 | 46 reference-encoding tests (`kaizo test core`); Mach-O check passes |
+| F | `.github/workflows/ci.yml`, `tests/ci_platform.sh` | the platform script passes 21/21 on Linux |
+
+CI plan: Linux builds and cross-builds; then on windows-latest, macos-latest (arm64) and
+macos-15-intel the native kaizo runs every suite, rebuilds itself for **all four targets** and must match
+the Linux cross builds byte for byte, serves hello-web over HTTP, and runs Snake (pty test on macOS).
+
+## Observations about the language
+- Hex constants written as decimal by hand were wrong 4 times (Mach-O magic ×2, two arm64 opcodes);
+  all were caught — by the Mach-O verifier and by encoding tests — but **hex literals** (`0xFADE0CC0`)
+  would remove the error class. Proposed as a small language step.
+- The "no grouping parentheses" rule caught one slip at parse time with a precise hint.
+- Name clashes across compiler files (`Target`, `Linked`) were caught by the global type namespace check.
+
+## Open
+- Run CI: needs a GitHub repository (human: create it, `git remote add origin …`, `git push`).
+- Not verified anywhere yet: Windows console raw mode (Snake interactively), macOS terminal raw mode
+  (checked by the pty test on CI), Rosetta not needed (native Intel runner).

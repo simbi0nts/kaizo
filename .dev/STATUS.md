@@ -1,7 +1,7 @@
 # Current status
 
-Current step: 0011 — cross-platform work, phase A done
-Next step:    0011 phase B — IR, PIC, OS-layer split (Linux)
+Current step: 0011 implemented — targets linux-x64, windows-x64, macos-x64, macos-arm64
+Next step:    run CI on GitHub (needs a remote), fix whatever the real Windows/macOS runners report
 
 ## Quick check
 ```
@@ -10,6 +10,10 @@ make selfhost   # core rebuilds itself byte-identically
 make e2e        # standalone Snake + Hello web end-to-end
 ```
 
+## Cross-platform
+`kaizo build app.gp -o app --target windows-x64|macos-x64|macos-arm64|linux-x64`. CI workflow:
+`.github/workflows/ci.yml` (Linux cross-builds; Windows/macOS runners run `tests/ci_platform.sh`).
+
 ## Proposed next steps (human picks)
 1. Garbage collector (needed for long-running servers).
 2. Static type checker (closes the gaps found by the blind test, step 0006 branch).
@@ -17,7 +21,8 @@ make e2e        # standalone Snake + Hello web end-to-end
 4. 2b mini text browser; content-hash lockfile for libraries.
 
 ## Toolchain
-Linux x86-64 and `make`. Nothing else: `seed/kaizo` (committed binary) builds the core.
+Linux x86-64 and `make`. Nothing else: `seed/kaizo` (committed Linux binary) builds the core.
+On Windows/macOS: take kaizo from the CI artifact (or cross-build it on Linux) and run it directly.
 For e2e tests: curl, python3. The Go bootstrap lives only in git history (tag `bootstrap-go`).
 
 ## Layout
