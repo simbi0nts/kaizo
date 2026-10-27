@@ -4,7 +4,9 @@ Current step: 0019 done — Phase 0 complete: CI green on Linux, Windows, macOS 
 Next step:    0020 — static type checker (Phase 1)
 
 ## Reserved steps
-(none)
+0020 — static type checker: inference, generics, records (this session)
+0021 — function types carry effects (this session)
+0022 — use the types: RC skips Int values, docs (this session)
 
 ## Quick check
 ```
