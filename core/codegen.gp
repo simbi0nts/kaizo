@@ -16,11 +16,35 @@ let tag_clo = 6
 type Loc = LSlot(Int) | LArg(Int) | LCap(Int) end
 type Bind = { name: String, loc: Loc } end
 type FIdx = { id: Int, idx: Int } end
-type Cx = { prog: Program, mod: Module, nargs: Int, fields: Map[List[FIdx]], rec_ids: Map[Int], embeds: Map[String] } end
-type G = { code: Code, slot: Int, lab: Int, data: Code, funcs: List[Code], wrappers: List[String], strs: Map[String] } end
+type Cx = { prog: Program, mod: Module, nargs: Int, fields: Map[List[FIdx]], rec_ids: Map[Int], embeds: Map[String], target: Target } end
+type G = { code: Code, slot: Int, lab: Int, data: Code, funcs: List[Code], wrappers: List[String], strs: Map[String], imports: List[String] } end
 type GL = { g: G, l: String } end
 type GS = { g: G, s: Int } end
 type GE = { g: G, env: List[Bind] } end
+
+fn jmp(l: String) -> Code
+  CI([IJmp(l)])
+end
+
+fn jcc(c: Int, l: String) -> Code
+  CI([IJcc(c, l)])
+end
+
+fn call_l(l: String) -> Code
+  CI([ICall(l)])
+end
+
+fn mov_addr(r: Int, l: String) -> Code
+  CI([IAddr(r, l)])
+end
+
+fn load_abs(r: Int, l: String) -> Code
+  CI([ILdG(r, l)])
+end
+
+fn store_abs(l: String, r: Int) -> Code
+  CI([IStG(l, r)])
+end
 
 let inline_builtins = ["add", "sub", "mul", "div", "mod", "eq", "ne", "lt", "le", "gt", "ge", "not", "and", "or",
   "bit_and", "bit_or", "bit_xor", "bit_shl", "bit_shr", "target"]
@@ -35,7 +59,7 @@ fn emit(g: G, c: Code) -> G
 end
 
 fn eb(g: G, b: List[Int]) -> G
-  { g with code: CCat(g.code, CB(b)) }
+  { g with code: CCat(g.code, CI(b)) }
 end
 
 fn new_label(g: G) -> GL
@@ -74,7 +98,7 @@ end
 
 fn str_object(s: String) -> Code
   let n = str_len(s)
-  let pad = sub(pad_to8(n), n)
+  let pad = sub(align_up(n, 8), n)
   cat([CB(lebytes(add(tag_str, mul(n, 256)), 8)), CS(s), CB(lebytes(0, pad))])
 end
 
@@ -110,7 +134,7 @@ end
 # runtime error at pos: push message, call rt fail (never returns)
 fn fail_code(g: G, pos: Pos, msg: String) -> G
   let s = str_lit(g, str_join([pos_str(pos), ": runtime error: ", msg], ""))
-  emit(s.g, cat([mov_addr(rax, s.l), CB(push_r(rax)), call_l(fn_label(rt_module, "fail"))]))
+  emit(s.g, cat([mov_addr(rax, s.l), CI(push_r(rax)), call_l(fn_label(rt_module, "fail"))]))
 end
 
 # continue if condition `ok_cc` holds after the preceding flags-setting code, else fail
@@ -124,14 +148,14 @@ end
 fn check_tag(g: G, tag: Int, pos: Pos, msg: String) -> G
   let bad = new_label(g)
   let ok = new_label(bad.g)
-  let g1 = emit(ok.g, cat([CB(test_low(rax, 1)), jcc(cc_ne, bad.l), CB(cmp_byte_mem(rax, 0, tag)), jcc(cc_e, ok.l), CLab(bad.l)]))
+  let g1 = emit(ok.g, cat([CI(test_low(rax, 1)), jcc(cc_ne, bad.l), CI(cmp_byte_mem(rax, 0, tag)), jcc(cc_e, ok.l), CLab(bad.l)]))
   emit(fail_code(g1, pos, msg), CLab(ok.l))
 end
 
 # fail unless r (rax/rcx) holds true or false
 fn check_bool(g: G, r: Int, pos: Pos, msg: String) -> G
   let ok = new_label(g)
-  let g1 = emit(ok.g, cat([mov_addr(rdx, "TRUE"), CB(op_rr(57, r, rdx)), jcc(cc_e, ok.l), mov_addr(rdx, "FALSE"), CB(op_rr(57, r, rdx)), jcc(cc_e, ok.l)]))
+  let g1 = emit(ok.g, cat([mov_addr(rdx, "TRUE"), CI(op_rr(57, r, rdx)), jcc(cc_e, ok.l), mov_addr(rdx, "FALSE"), CI(op_rr(57, r, rdx)), jcc(cc_e, ok.l)]))
   emit(fail_code(g1, pos, msg), CLab(ok.l))
 end
 
@@ -277,7 +301,7 @@ fn cg_if(cx: Cx, g: G, env: List[Bind], conds: List[Expr], bodies: List[List[Stm
       let next = new_label(g)
       let yes = new_label(next.g)
       let g1 = cg(cx, yes.g, env, c, false)
-      let g2 = emit(g1, cat([mov_addr(rdx, "TRUE"), CB(op_rr(57, rax, rdx)), jcc(cc_e, yes.l), mov_addr(rdx, "FALSE"), CB(op_rr(57, rax, rdx))]))
+      let g2 = emit(g1, cat([mov_addr(rdx, "TRUE"), CI(op_rr(57, rax, rdx)), jcc(cc_e, yes.l), mov_addr(rdx, "FALSE"), CI(op_rr(57, rax, rdx))]))
       let g3 = emit(check_cc(g2, cc_e, expr_pos(c), "if condition must be Bool"), jmp(next.l))
       let g4 = cg_block(cx, emit(g3, CLab(yes.l)), env, unwrap_or(list_get(bodies, 0), []), tail)
       let g5 = emit(g4, cat([jmp(done), CLab(next.l)]))
@@ -289,15 +313,8 @@ fn push_args(cx: Cx, g: G, env: List[Bind], args: List[Expr]) -> G
   list_fold(args, g, fn(acc, a) eb(cg(cx, acc, env, a, false), push_r(rax)) end)
 end
 
-# rewrite the current frame so that the n pushed args become the callee's args, then jump
-fn tail_move(cx: Cx, n: Int) -> List[Int]
-  let m = cx.nargs
-  let base = sub(add(16, mul(8, m)), mul(8, n))
-  let moves = list_fold(list_reverse(list_range(0, n)), [], fn(acc, j)
-    list_concat(acc, list_concat(ldm(rax, rsp, mul(8, j)), store(rbp, add(base, mul(8, j)), rax)))
-  end)
-  list_concat(list_concat(list_concat(ldm(rcx, rbp, 8), ldm(rdx, rbp, 0)), moves),
-    list_concat(list_concat(lea(rsp, rbp, sub(base, 8)), store(rsp, 0, rcx)), mov_rr(rbp, rdx)))
+fn tail_move(cx: Cx, n: Int) -> List[Ins]
+  [ITail(n, cx.nargs)]
 end
 
 fn embed_value(cx: Cx, pos: Pos, args: List[Expr]) -> Option[String]
@@ -410,7 +427,7 @@ fn field_dispatch(cx: Cx, g: G, pos: Pos, name: String, on_index: Fn(G, Int) -> 
     let skip = new_label(acc.g)
     let ids = list_filter(cands, fn(c) eq(c.idx, idx) end)
     let hit = new_label(skip.g)
-    let g1 = list_fold(ids, hit.g, fn(a2, c) emit(a2, cat([CB(alu_imm(7, rcx, c.id)), jcc(cc_e, hit.l)])) end)
+    let g1 = list_fold(ids, hit.g, fn(a2, c) emit(a2, cat([CI(alu_imm(7, rcx, c.id)), jcc(cc_e, hit.l)])) end)
     let g2 = on_index(emit(g1, cat([jmp(skip.l), CLab(hit.l)])), idx)
     GL { g: emit(g2, cat([jmp(done.l), CLab(skip.l)])), l: "" }
   end)
@@ -449,7 +466,7 @@ fn cg_match(cx: Cx, g: G, env: List[Bind], pos: Pos, x: Expr, arms: List[Arm], t
     emit(g4, cat([jmp(done.l), CLab(next.l)]))
   end)
   let s = str_lit(g3, str_join([pos_str(pos), ": runtime error: no case matched value "], ""))
-  let g5 = emit(s.g, cat([mov_addr(rax, s.l), CB(push_r(rax)), CB(ldm(rax, rbp, slot_disp(sl.s))), CB(push_r(rax)), call_l(fn_label(rt_module, "fail_value"))]))
+  let g5 = emit(s.g, cat([mov_addr(rax, s.l), CI(push_r(rax)), CI(ldm(rax, rbp, slot_disp(sl.s))), CI(push_r(rax)), call_l(fn_label(rt_module, "fail_value"))]))
   emit(g5, CLab(done.l))
 end
 
@@ -469,24 +486,24 @@ fn cg_pat(cx: Cx, g: G, env: List[Bind], p: Pat, src: Int, fail: String) -> GE
   match p
     case PWild(_) -> GE { g: g, env: env }
     case PVar(_, n) -> GE { g: g, env: list_cons(Bind { name: n, loc: LSlot(src) }, env) }
-    case PInt(_, n) -> GE { g: emit(g, cat([CB(list_concat(ld, list_concat(mov_imm64(rcx, tagged(n)), op_rr(57, rax, rcx)))), jcc(cc_ne, fail)])), env: env }
-    case PBool(_, v) -> GE { g: emit(g, cat([CB(ld), mov_addr(rdx, if v then "TRUE" else "FALSE" end), CB(op_rr(57, rax, rdx)), jcc(cc_ne, fail)])), env: env }
+    case PInt(_, n) -> GE { g: emit(g, cat([CI(list_concat(ld, list_concat(mov_imm64(rcx, tagged(n)), op_rr(57, rax, rcx)))), jcc(cc_ne, fail)])), env: env }
+    case PBool(_, v) -> GE { g: emit(g, cat([CI(ld), mov_addr(rdx, if v then "TRUE" else "FALSE" end), CI(op_rr(57, rax, rdx)), jcc(cc_ne, fail)])), env: env }
     case PStr(_, s) ->
       let r = str_lit(g, s)
-      GE { g: emit(r.g, cat([CB(list_concat(ld, push_r(rax))), mov_addr(rax, r.l), CB(push_r(rax)), call_l(fn_label(rt_module, "equal")),
-        mov_addr(rdx, "TRUE"), CB(op_rr(57, rax, rdx)), jcc(cc_ne, fail)])), env: env }
+      GE { g: emit(r.g, cat([CI(list_concat(ld, push_r(rax))), mov_addr(rax, r.l), CI(push_r(rax)), call_l(fn_label(rt_module, "equal")),
+        mov_addr(rdx, "TRUE"), CI(op_rr(57, rax, rdx)), jcc(cc_ne, fail)])), env: env }
     case PCtor(_, n, args) ->
       let id = match map.get(cx.prog.ctors, n)
         case Some(info) -> info.id
         case None -> -1
       end
-      let g1 = emit(g, cat([CB(list_concat(ld, test_low(rax, 1))), jcc(cc_ne, fail), CB(cmp_byte_mem(rax, 0, tag_ctor)), jcc(cc_ne, fail),
-        CB(cmp_mem_imm(rax, 8, id)), jcc(cc_ne, fail)]))
+      let g1 = emit(g, cat([CI(list_concat(ld, test_low(rax, 1))), jcc(cc_ne, fail), CI(cmp_byte_mem(rax, 0, tag_ctor)), jcc(cc_ne, fail),
+        CI(cmp_mem_imm(rax, 8, id)), jcc(cc_ne, fail)]))
       cg_sub_pats(cx, g1, env, args, src, 0, fail, fn(i) list_concat(ldm(rcx, rbp, slot_disp(src)), ldm(rax, rcx, add(16, mul(8, i)))) end)
     case PList(_, items, rest) ->
       let k = list_len(items)
-      let g1 = emit(g, cat([CB(list_concat(ld, test_low(rax, 1))), jcc(cc_ne, fail), CB(cmp_byte_mem(rax, 0, tag_list)), jcc(cc_ne, fail),
-        CB(list_concat(list_concat(ldm(rcx, rax, 0), shift(5, rcx, 8)), alu_imm(7, rcx, k))), jcc(if is_some(rest) then cc_l else cc_ne end, fail)]))
+      let g1 = emit(g, cat([CI(list_concat(ld, test_low(rax, 1))), jcc(cc_ne, fail), CI(cmp_byte_mem(rax, 0, tag_list)), jcc(cc_ne, fail),
+        CI(list_concat(list_concat(ldm(rcx, rax, 0), shift(5, rcx, 8)), alu_imm(7, rcx, k))), jcc(if is_some(rest) then cc_l else cc_ne end, fail)]))
       let r = cg_sub_pats(cx, g1, env, items, src, 0, fail, fn(i) list_concat(list_concat(ldm(rcx, rbp, slot_disp(src)), ldm(rcx, rcx, 8)), ldm(rax, rcx, mul(8, i))) end)
       match rest
         case None -> r
@@ -564,8 +581,8 @@ fn cg_lambda(cx: Cx, g: G, env: List[Bind], params: List[String], body: List[Stm
     list_map(list_range(0, k), fn(i) Bind { name: unwrap_or(list_get(caps, i), ""), loc: LCap(i) } end))
   let g1 = cg_function({ cx with nargs: list_len(params) }, lab.g, lab.l, list_len(params), list_reverse(inner_env), body)
   let g2 = alloc_fixed(g1, add(24, mul(8, k)))
-  let g3 = emit(g2, cat([CB(list_concat(mov_imm64(rcx, add(tag_clo, mul(k, 256))), store(rax, 0, rcx))), mov_addr(rcx, lab.l),
-    CB(list_concat(list_concat(store(rax, 8, rcx), mov_imm64(rcx, list_len(params))), store(rax, 16, rcx)))]))
+  let g3 = emit(g2, cat([CI(list_concat(mov_imm64(rcx, add(tag_clo, mul(k, 256))), store(rax, 0, rcx))), mov_addr(rcx, lab.l),
+    CI(list_concat(list_concat(store(rax, 8, rcx), mov_imm64(rcx, list_len(params))), store(rax, 16, rcx)))]))
   list_fold(list_range(0, k), g3, fn(acc, i)
     match lookup_env(env, unwrap_or(list_get(caps, i), ""))
       case Some(loc) -> eb(acc, list_concat(load_loc(cx, rcx, loc), store(rax, add(24, mul(8, i)), rcx)))
@@ -578,9 +595,9 @@ end
 fn cg_function(cx: Cx, g: G, label: String, nparams: Int, env: List[Bind], body: List[Stmt]) -> G
   let g1 = cg_block({ cx with nargs: nparams }, { g with code: CNil, slot: 1 }, env, body, true)
   let frame = mul(8, g1.slot)
-  let prologue = list_concat(list_concat(push_r(rbp), mov_rr(rbp, rsp)), list_concat(alu_imm(5, rsp, frame), store(rbp, -8, r15)))
-  let epilogue = list_concat(list_concat(mov_rr(rsp, rbp), pop_r(rbp)), ret_n(mul(8, nparams)))
-  let f = cat([CLab(label), CB(prologue), g1.code, CB(epilogue)])
+  let prologue = [IEnter, IAluI(5, rsp, frame), ISt(rbp, -8, r15)]
+  let epilogue = [ILeave(mul(8, nparams))]
+  let f = cat([CLab(label), CI(prologue), g1.code, CI(epilogue)])
   { g1 with funcs: list_push(g1.funcs, f), code: g.code, slot: g.slot }
 end
 
@@ -608,18 +625,18 @@ fn cg_divmod(g: G, pos: Pos, name: String, is_mod: Bool) -> G
   let g1 = check_ints(g, pos, name)
   let g2 = check_cc(eb(g1, list_concat(list_concat(shift(7, rcx, 1), shift(7, rax, 1)), op_rr(133, rax, rax))), cc_ne, pos, str_cat(name, " by zero"))
   let fix = new_label(g2)
-  let g3 = eb(fix.g, list_concat(list_concat(mov_rr(r8, rax), mov_rr(rax, rcx)), list_concat(cqo, idiv(r8))))
-  let g4 = emit(g3, cat([CB(op_rr(133, rdx, rdx)), jcc(cc_e, fix.l), CB(list_concat(mov_rr(r9, rdx), op_rr(49, r9, r8))), jcc(cc_ns, fix.l),
-    CB(list_concat(alu_imm(5, rax, 1), op_rr(1, rdx, r8))), CLab(fix.l)]))
+  let g3 = eb(fix.g, list_concat(list_concat(mov_rr(r8, rax), mov_rr(rax, rcx)), div_op))
+  let g4 = emit(g3, cat([CI(op_rr(133, rdx, rdx)), jcc(cc_e, fix.l), CI(list_concat(list_concat(mov_rr(r9, rdx), op_rr(49, r9, r8)), op_rr(133, r9, r9))), jcc(cc_ns, fix.l),
+    CI(list_concat(alu_imm(5, rax, 1), op_rr(1, rdx, r8))), CLab(fix.l)]))
   eb(g4, list_concat(if is_mod then mov_rr(rax, rdx) else [] end, tag_rax()))
 end
 
 fn cg_compare(g: G, pos: Pos, c: Int) -> G
   let slow = new_label(g)
   let go = new_label(slow.g)
-  let g1 = emit(go.g, cat([CB(list_concat(mov_rr(rdx, rcx), list_concat(op_rr(33, rdx, rax), test_low(rdx, 1)))), jcc(cc_e, slow.l),
-    CB(op_rr(57, rcx, rax)), jmp(go.l), CLab(slow.l), CB(list_concat(push_r(rcx), push_r(rax))), call_l(fn_label(rt_module, "compare")),
-    CB(alu_imm(7, rax, 1)), CLab(go.l)]))
+  let g1 = emit(go.g, cat([CI(list_concat(mov_rr(rdx, rcx), list_concat(op_rr(33, rdx, rax), test_low(rdx, 1)))), jcc(cc_e, slow.l),
+    CI(op_rr(57, rcx, rax)), jmp(go.l), CLab(slow.l), CI(list_concat(push_r(rcx), push_r(rax))), call_l(fn_label(rt_module, "compare")),
+    CI(alu_imm(7, rax, 1)), CLab(go.l)]))
   set_bool(g1, c)
 end
 
@@ -630,12 +647,12 @@ fn cg_equal(g: G, negate: Bool) -> G
   let yes = if negate then "FALSE" else "TRUE" end
   let no = if negate then "TRUE" else "FALSE" end
   let deep = if negate then
-    cat([call_l(fn_label(rt_module, "equal")), mov_addr(rdx, "TRUE"), CB(op_rr(57, rax, rdx)), jcc(cc_e, t.l), jmp(f.l)])
+    cat([call_l(fn_label(rt_module, "equal")), mov_addr(rdx, "TRUE"), CI(op_rr(57, rax, rdx)), jcc(cc_e, t.l), jmp(f.l)])
   else
     cat([call_l(fn_label(rt_module, "equal")), jmp(e.l)])
   end
-  emit(e.g, cat([CB(op_rr(57, rcx, rax)), jcc(cc_e, t.l), CB(list_concat(mov_rr(rdx, rcx), list_concat(op_rr(9, rdx, rax), test_low(rdx, 1)))), jcc(cc_ne, f.l),
-    CB(list_concat(push_r(rcx), push_r(rax))), deep,
+  emit(e.g, cat([CI(op_rr(57, rcx, rax)), jcc(cc_e, t.l), CI(list_concat(mov_rr(rdx, rcx), list_concat(op_rr(9, rdx, rax), test_low(rdx, 1)))), jcc(cc_ne, f.l),
+    CI(list_concat(push_r(rcx), push_r(rax))), deep,
     CLab(t.l), mov_addr(rax, yes), jmp(e.l), CLab(f.l), mov_addr(rax, no), CLab(e.l)]))
 end
 
@@ -644,8 +661,8 @@ fn slot_base(g: G) -> G
   let l = new_label(g)
   let c = new_label(l.g)
   let d = new_label(c.g)
-  emit(d.g, cat([CB(cmp_byte_mem(rcx, 0, tag_list)), jcc(cc_e, l.l), CB(cmp_byte_mem(rcx, 0, tag_clo)), jcc(cc_e, c.l),
-    CB(lea(rcx, rcx, 16)), jmp(d.l), CLab(l.l), CB(ldm(rcx, rcx, 8)), jmp(d.l), CLab(c.l), CB(lea(rcx, rcx, 24)), CLab(d.l)]))
+  emit(d.g, cat([CI(cmp_byte_mem(rcx, 0, tag_list)), jcc(cc_e, l.l), CI(cmp_byte_mem(rcx, 0, tag_clo)), jcc(cc_e, c.l),
+    CI(lea(rcx, rcx, 16)), jmp(d.l), CLab(l.l), CI(ldm(rcx, rcx, 8)), jmp(d.l), CLab(c.l), CI(lea(rcx, rcx, 24)), CLab(d.l)]))
 end
 
 fn unit_rax() -> Code
@@ -666,11 +683,11 @@ fn cg_inline(cx: Cx, g: G, env: List[Bind], pos: Pos, name: String, args: List[E
   elif eq(name, "ne") then cg_equal(args2(cx, g, env, args), true)
   elif eq(name, "not") then
     let g1 = check_bool(arg1(cx, g, env, args), rax, pos, "not: argument must be Bool")
-    set_bool(emit(g1, cat([mov_addr(rdx, "FALSE"), CB(op_rr(57, rax, rdx))])), cc_e)
+    set_bool(emit(g1, cat([mov_addr(rdx, "FALSE"), CI(op_rr(57, rax, rdx))])), cc_e)
   elif or(eq(name, "and"), eq(name, "or")) then
     let g1 = check_bool(check_bool(args2(cx, g, env, args), rcx, pos, str_cat(name, ": arguments must be Bool")), rax, pos, str_cat(name, ": arguments must be Bool"))
     let keep = new_label(g1)
-    emit(keep.g, cat([mov_addr(rdx, if eq(name, "and") then "FALSE" else "TRUE" end), CB(op_rr(57, rcx, rdx)), jcc(cc_ne, keep.l), CB(mov_rr(rax, rdx)), CLab(keep.l)]))
+    emit(keep.g, cat([mov_addr(rdx, if eq(name, "and") then "FALSE" else "TRUE" end), CI(op_rr(57, rcx, rdx)), jcc(cc_ne, keep.l), CI(mov_rr(rax, rdx)), CLab(keep.l)]))
   elif eq(name, "bit_and") then eb(check_ints(args2(cx, g, env, args), pos, name), op_rr(33, rax, rcx))
   elif eq(name, "bit_or") then eb(check_ints(args2(cx, g, env, args), pos, name), op_rr(9, rax, rcx))
   elif eq(name, "bit_xor") then eb(check_ints(args2(cx, g, env, args), pos, name), list_concat(op_rr(49, rax, rcx), alu_imm(1, rax, 1)))
@@ -681,7 +698,7 @@ fn cg_inline(cx: Cx, g: G, env: List[Bind], pos: Pos, name: String, args: List[E
     eb(check_ints(args2(cx, g, env, args), pos, name), list_concat(list_concat(list_concat(mov_rr(r8, rax), shift(7, r8, 1)), list_concat(mov_rr(rax, rcx), shift(7, rax, 1))),
       list_concat(list_concat(mov_rr(rcx, r8), shift_cl(7, rax)), tag_rax())))
   elif eq(name, "target") then
-    let r = str_lit(g, "linux-x64")
+    let r = str_lit(g, cx.target.name)
     emit(r.g, mov_addr(rax, r.l))
   else cg_prim(cx, g, env, pos, name, args)
   end
@@ -695,7 +712,7 @@ fn cg_prim(cx: Cx, g: G, env: List[Bind], pos: Pos, name: String, args: List[Exp
   if eq(name, "prim_tag") then
     let p = new_label(g)
     let e = new_label(p.g)
-    emit(arg1(cx, e.g, env, args), cat([CB(test_low(rax, 1)), jcc(cc_e, p.l), CB(mov_imm64(rax, 1)), jmp(e.l), CLab(p.l), CB(list_concat(movzx_byte(rax, rax, 0), tag_rax())), CLab(e.l)]))
+    emit(arg1(cx, e.g, env, args), cat([CI(test_low(rax, 1)), jcc(cc_e, p.l), CI(mov_imm64(rax, 1)), jmp(e.l), CLab(p.l), CI(list_concat(movzx_byte(rax, rax, 0), tag_rax())), CLab(e.l)]))
   elif eq(name, "prim_len") then eb(arg1(cx, g, env, args), list_concat(list_concat(ldm(rax, rax, 0), shift(5, rax, 8)), tag_rax()))
   elif eq(name, "prim_id") then eb(arg1(cx, g, env, args), list_concat(ldm(rax, rax, 8), tag_rax()))
   elif eq(name, "prim_slot") then
@@ -735,16 +752,19 @@ fn cg_prim(cx: Cx, g: G, env: List[Bind], pos: Pos, name: String, args: List[Exp
   elif eq(name, "prim_record_name") then name_table(arg1(cx, g, env, args), "t:rec_names")
   elif eq(name, "prim_field_name") then
     let g1 = args2(cx, g, env, args)
-    emit(g1, cat([CB(list_concat(ldm(rcx, rcx, 8), shift(4, rcx, 3))), mov_addr(rdx, "t:rec_fields"),
-      CB(list_concat(list_concat(list_concat(op_rr(1, rdx, rcx), ldm(rdx, rdx, 0)), ldm(rdx, rdx, 8)), list_concat(list_concat(shift(7, rax, 1), shift(4, rax, 3)), list_concat(op_rr(1, rdx, rax), ldm(rax, rdx, 0)))))]))
-  elif eq(name, "prim_argv") then eb(emit(g, load_abs(rax, "argv_base")), tag_rax())
+    emit(g1, cat([CI(list_concat(ldm(rcx, rcx, 8), shift(4, rcx, 3))), mov_addr(rdx, "t:rec_fields"),
+      CI(list_concat(list_concat(list_concat(op_rr(1, rdx, rcx), ldm(rdx, rdx, 0)), ldm(rdx, rdx, 8)), list_concat(list_concat(shift(7, rax, 1), shift(4, rax, 3)), list_concat(op_rr(1, rdx, rax), ldm(rax, rdx, 0)))))]))
+  elif eq(name, "prim_argc") then eb(emit(g, load_abs(rax, "g_argc")), tag_rax())
+  elif eq(name, "prim_argv") then eb(emit(g, load_abs(rax, "g_argv")), tag_rax())
+  elif eq(name, "prim_envp") then eb(emit(g, load_abs(rax, "g_envp")), tag_rax())
+  elif or(eq(name, "prim_ccall"), eq(name, "prim_ccall32")) then cg_ccall(cx, g, env, pos, args, eq(name, "prim_ccall32"))
   elif eq(name, "prim_handle") then
     eb(arg1(cx, g, env, args), list_concat(list_concat(list_concat(shift(7, rax, 1), mov_rr(rcx, r14)), list_concat(alu_imm(0, r14, 16), mov_imm64(rdx, 7))),
       list_concat(list_concat(store(rcx, 0, rdx), store(rcx, 8, rax)), mov_rr(rax, rcx))))
   elif eq(name, "prim_term_save") then
     let p = new_label(g)
     let s = new_label(p.g)
-    emit(arg1(cx, s.g, env, args), cat([CB(test_low(rax, 1)), jcc(cc_e, p.l), CB(mov_imm64(rax, 0)), jmp(s.l), CLab(p.l), CB(alu_imm(0, rax, 8)), CLab(s.l),
+    emit(arg1(cx, s.g, env, args), cat([CI(test_low(rax, 1)), jcc(cc_e, p.l), CI(mov_imm64(rax, 0)), jmp(s.l), CLab(p.l), CI(alu_imm(0, rax, 8)), CLab(s.l),
       store_abs("termios_ptr", rax), unit_rax()]))
   elif eq(name, "prim_copy") then
     let g1 = cg(cx, push_all(cx, g, env, list_slice(args, 0, 4)), env, unwrap_or(list_get(args, 4), EInt(pos, 0)), false)
@@ -755,6 +775,25 @@ fn cg_prim(cx: Cx, g: G, env: List[Bind], pos: Pos, name: String, args: List[Exp
   end
 end
 
+# prim_ccall("sym", [args]) / prim_ccall("dll!sym", [args]): call a C function of the OS
+fn cg_ccall(cx: Cx, g: G, env: List[Bind], pos: Pos, args: List[Expr], ret32: Bool) -> G
+  match args
+    case [EStr(_, sym), EList(_, items)] ->
+      let g1 = list_fold(items, g, fn(acc, x) eb(cg(cx, acc, env, x, false), list_concat(shift(7, rax, 1), push_r(rax))) end)
+      let g2 = if list_contains(g1.imports, sym) then g1 else { g1 with imports: list_push(g1.imports, sym) } end
+      eb(g2, list_concat([ICCall(import_sym(sym), list_len(items), ret32)], tag_rax()))
+    case _ -> fail_code(g, pos, "prim_ccall needs a string literal and a list literal")
+  end
+end
+
+# "dll!sym" -> "sym" (the dll only matters for the Windows import table)
+fn import_sym(s: String) -> String
+  match str_find(s, "!")
+    case Some(i) -> str_slice(s, add(i, 1), str_len(s))
+    case None -> s
+  end
+end
+
 fn name_table(g: G, table: String) -> G
-  emit(g, cat([CB(list_concat(ldm(rcx, rax, 8), shift(4, rcx, 3))), mov_addr(rdx, table), CB(list_concat(op_rr(1, rdx, rcx), ldm(rax, rdx, 0)))]))
+  emit(g, cat([CI(list_concat(ldm(rcx, rax, 8), shift(4, rcx, 3))), mov_addr(rdx, table), CI(list_concat(op_rr(1, rdx, rcx), ldm(rax, rdx, 0)))]))
 end

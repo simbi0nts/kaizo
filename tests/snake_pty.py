@@ -4,10 +4,13 @@ end the game, and the terminal settings (echo, canonical mode) are restored afte
 import os, pty, sys, termios, time, select, signal
 
 def run(cmd, keys, sig=None, wait=1.0):
+    gate_r, gate_w = os.pipe()
     pid, fd = pty.fork()
     if pid == 0:
+        os.read(gate_r, 1)  # wait until the parent has recorded the initial terminal state
         os.execvp(cmd[0], cmd)
     before = termios.tcgetattr(fd)
+    os.write(gate_w, b"x")
     out = b""
     def drain(t):
         nonlocal out

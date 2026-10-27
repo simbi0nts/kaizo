@@ -1,40 +1,4 @@
-# x86-64 machine code: instruction encoders (byte lists), a code rope, and the assembler/linker
-# that turns ropes into one static ELF executable. No external assembler or linker is used.
-
-# ---------- registers ----------
-let rax = 0
-let rcx = 1
-let rdx = 2
-let rbx = 3
-let rsp = 4
-let rbp = 5
-let rsi = 6
-let rdi = 7
-let r8 = 8
-let r9 = 9
-let r10 = 10
-let r14 = 14
-let r15 = 15
-
-# condition codes
-let cc_e = 4
-let cc_ne = 5
-let cc_l = 12
-let cc_ge = 13
-let cc_le = 14
-let cc_g = 15
-let cc_s = 8
-let cc_ns = 9
-
-# ---------- encoding helpers ----------
-
-fn lebytes(n: Int, k: Int) -> List[Int]
-  le_acc(n, k, [])
-end
-
-fn le_acc(n: Int, k: Int, acc: List[Int]) -> List[Int]
-  if eq(k, 0) then acc else le_acc(div(n, 256), sub(k, 1), list_push(acc, mod(n, 256))) end
-end
+# x86-64: instruction encoders and the lowering of IR instructions to machine code.
 
 fn bit(c: Bool, v: Int) -> Int
   if c then v else 0 end
@@ -58,297 +22,143 @@ fn cat3(a: List[Int], b: List[Int], c: List[Int]) -> List[Int]
   list_concat(list_concat(a, b), c)
 end
 
-# op r/m64(dst), r64(src): 0x01 add, 0x29 sub, 0x39 cmp, 0x89 mov, 0x21 and, 0x09 or, 0x31 xor, 0x85 test
-fn op_rr(opc: Int, dst: Int, src: Int) -> List[Int]
+fn x_op_rr(opc: Int, dst: Int, src: Int) -> List[Int]
   [rex(true, src, 0, dst), opc, modrm(3, src, dst)]
 end
 
-fn mov_rr(dst: Int, src: Int) -> List[Int]
-  op_rr(137, dst, src)
+fn x_mov(d: Int, s: Int) -> List[Int]
+  x_op_rr(137, d, s)
 end
 
-fn ldm(dst: Int, base: Int, disp: Int) -> List[Int]
-  list_concat([rex(true, dst, 0, base), 139], mem(dst, base, disp))
+fn x_load(d: Int, base: Int, disp: Int) -> List[Int]
+  list_concat([rex(true, d, 0, base), 139], mem(d, base, disp))
 end
 
-fn store(base: Int, disp: Int, src: Int) -> List[Int]
-  list_concat([rex(true, src, 0, base), 137], mem(src, base, disp))
+fn x_store(base: Int, disp: Int, s: Int) -> List[Int]
+  list_concat([rex(true, s, 0, base), 137], mem(s, base, disp))
 end
 
-fn lea(dst: Int, base: Int, disp: Int) -> List[Int]
-  list_concat([rex(true, dst, 0, base), 141], mem(dst, base, disp))
+fn x_lea(d: Int, base: Int, disp: Int) -> List[Int]
+  list_concat([rex(true, d, 0, base), 141], mem(d, base, disp))
 end
 
-fn mov_imm64(r: Int, n: Int) -> List[Int]
-  list_concat([rex(true, 0, 0, r), add(184, mod(r, 8))], lebytes(n, 8))
+fn x_movi(r: Int, n: Int) -> List[Int]
+  if and(ge(n, 0), lt(n, 2147483648)) then
+    cat3(if ge(r, 8) then [65] else [] end, [add(184, mod(r, 8))], lebytes(n, 4))
+  else
+    list_concat([rex(true, 0, 0, r), add(184, mod(r, 8))], lebytes(n, 8))
+  end
 end
 
-fn mov_imm32(r: Int, n: Int) -> List[Int]
-  let pre = if ge(r, 8) then [65] else [] end
-  cat3(pre, [add(184, mod(r, 8))], lebytes(n, 4))
-end
-
-# ext: 0 add, 1 or, 4 and, 5 sub, 7 cmp
-fn alu_imm(ext: Int, r: Int, n: Int) -> List[Int]
+fn x_alu_imm(ext: Int, r: Int, n: Int) -> List[Int]
   list_concat([rex(true, 0, 0, r), 129, modrm(3, ext, r)], lebytes(n, 4))
 end
 
-# ext: 4 shl, 5 shr, 7 sar
-fn shift(ext: Int, r: Int, n: Int) -> List[Int]
+fn x_shift(ext: Int, r: Int, n: Int) -> List[Int]
   [rex(true, 0, 0, r), 193, modrm(3, ext, r), n]
 end
 
-# shift r by cl; ext: 4 shl, 5 shr, 7 sar
-fn shift_cl(ext: Int, r: Int) -> List[Int]
-  [rex(true, 0, 0, r), 211, modrm(3, ext, r)]
-end
-
-fn push_r(r: Int) -> List[Int]
+fn x_push(r: Int) -> List[Int]
   if ge(r, 8) then [65, add(80, mod(r, 8))] else [add(80, r)] end
 end
 
-fn pop_r(r: Int) -> List[Int]
+fn x_pop(r: Int) -> List[Int]
   if ge(r, 8) then [65, add(88, mod(r, 8))] else [add(88, r)] end
 end
 
-fn imul(dst: Int, src: Int) -> List[Int]
-  [rex(true, dst, 0, src), 15, 175, modrm(3, dst, src)]
-end
-
-fn idiv(r: Int) -> List[Int]
-  [rex(true, 0, 0, r), 247, modrm(3, 7, r)]
-end
-
-let cqo = [72, 153]
-let syscall_op = [15, 5]
-let rep_movsb = [243, 164]
-let rep_movsq = [243, 72, 165]
-
-fn ret_n(n: Int) -> List[Int]
+fn x_ret(n: Int) -> List[Int]
   if eq(n, 0) then [195] else list_concat([194], lebytes(n, 2)) end
 end
 
-# test low byte of rax/rcx/rdx/rbx with an imm8
-fn test_low(r: Int, imm: Int) -> List[Int]
-  [246, modrm(3, 0, r), imm]
-end
-
-fn cmp_byte_mem(base: Int, disp: Int, imm: Int) -> List[Int]
+fn x_mem_op(pre_op: List[Int], ext: Int, base: Int, disp: Int) -> List[Int]
   let pre = if ge(base, 8) then [65] else [] end
-  cat3(pre, list_concat([128], mem(7, base, disp)), [imm])
+  cat3(pre, pre_op, mem(ext, base, disp))
 end
 
-fn cmp_mem_imm(base: Int, disp: Int, n: Int) -> List[Int]
-  cat3([rex(true, 0, 0, base), 129], mem(7, base, disp), lebytes(n, 4))
+# rip-relative operand: bytes before the disp32, then the rel32 to the label
+fn x_rip(prefix: List[Int], l: String) -> Code
+  CCat(CB(prefix), CRel(l))
 end
 
-fn movzx_byte(dst: Int, base: Int, disp: Int) -> List[Int]
-  list_concat([rex(true, dst, 0, base), 15, 182], mem(dst, base, disp))
+# windows: rcx rdx r8 r9 (+ stack, 32-byte shadow) · others (SysV): rdi rsi rdx rcx r8 r9
+fn abi_regs(t: Target) -> List[Int]
+  if eq(t.os, "windows") then [rcx, rdx, r8, r9] else [rdi, rsi, rdx, rcx, r8, r9] end
 end
 
-# store the low byte of src (rax/rcx/rdx/rbx only)
-fn store_byte(base: Int, disp: Int, src: Int) -> List[Int]
-  list_concat([rex(false, src, 0, base), 136], mem(src, base, disp))
+fn imp_label(sym: String) -> String
+  str_cat("imp:", sym)
 end
 
-fn call_mem(base: Int, disp: Int) -> List[Int]
-  let pre = if ge(base, 8) then [65] else [] end
-  cat3(pre, [255], mem(2, base, disp))
-end
-
-fn jmp_mem(base: Int, disp: Int) -> List[Int]
-  let pre = if ge(base, 8) then [65] else [] end
-  cat3(pre, [255], mem(4, base, disp))
-end
-
-# ---------- code rope ----------
-# CB: raw bytes · CS: raw string bytes · CLab: label here · CRel: rel32 to label ·
-# CA32 / CA64: absolute address of label (4 / 8 bytes). Labels starting with "." are local.
-
-type Code = CNil | CB(List[Int]) | CS(String) | CLab(String) | CRel(String) | CA32(String) | CA64(String) | CCat(Code, Code) end
-type Items = INil | ICons(Code, Items) end
-
-fn cat(parts: List[Code]) -> Code
-  list_fold(parts, CNil, fn(acc, c) CCat(acc, c) end)
-end
-
-fn jmp(l: String) -> Code
-  CCat(CB([233]), CRel(l))
-end
-
-fn jcc(c: Int, l: String) -> Code
-  CCat(CB([15, add(128, c)]), CRel(l))
-end
-
-fn call_l(l: String) -> Code
-  CCat(CB([232]), CRel(l))
-end
-
-# mov r32, imm32 = absolute address of label (fits: image is below 2 GiB)
-fn mov_addr(r: Int, l: String) -> Code
-  let pre = if ge(r, 8) then [65] else [] end
-  CCat(CB(list_concat(pre, [add(184, mod(r, 8))])), CA32(l))
-end
-
-# mov rax, [abs32]  /  mov [abs32], r
-fn load_abs(r: Int, l: String) -> Code
-  CCat(CB([rex(true, r, 0, 0), 139, modrm(0, r, 4), 37]), CA32(l))
-end
-
-fn store_abs(l: String, r: Int) -> Code
-  CCat(CB([rex(true, r, 0, 0), 137, modrm(0, r, 4), 37]), CA32(l))
-end
-
-fn flatten(c: Code, acc: Items) -> Items
-  match c
-    case CNil -> acc
-    case CCat(a, b) -> flatten(a, flatten(b, acc))
-    case leaf -> ICons(leaf, acc)
+# C call with n arguments on our stack (last on top); our stack pointer is restored afterwards
+fn x_ccall(t: Target, sym: String, n: Int, ret32: Bool) -> Code
+  let regs = abi_regs(t)
+  let nreg = min(n, list_len(regs))
+  let loads = list_fold(list_range(0, nreg), [], fn(acc, i) list_concat(acc, x_load(unwrap_or(list_get(regs, i), rax), rbx, mul(8, sub(sub(n, 1), i)))) end)
+  let save = x_mov(rbx, rsp)
+  let after = list_concat(x_lea(rsp, rbx, mul(8, n)), if ret32 then [72, 99, 192] else [] end)
+  if eq(t.os, "windows") then
+    let extra = max(0, sub(n, 4))
+    let frame = list_concat(list_concat(x_mov(rax, rsp), x_alu_imm(5, rax, add(32, mul(8, extra)))), x_alu_imm(4, rax, -16))
+    let stack_args = list_fold(list_range(4, max(4, n)), [], fn(acc, i)
+      list_concat(acc, list_concat(x_load(r10, rbx, mul(8, sub(sub(n, 1), i))), x_store(rax, add(32, mul(8, sub(i, 4))), r10)))
+    end)
+    cat([CB(cat3(save, frame, list_concat(stack_args, list_concat(loads, x_mov(rsp, rax))))), x_rip([255, 21], imp_label(sym)), CB(after)])
+  else
+    cat([CB(cat3(save, loads, list_concat(x_alu_imm(4, rsp, -16), x_movi(rax, 0)))), x_rip([255, 21], imp_label(sym)), CB(after)])
   end
 end
 
-# ---------- assembling one blob ----------
-
-type Fixup = { off: Int, kind: Int, sym: String } end
-type Sym = { name: String, off: Int } end
-type Blob = { bytes: String, syms: List[Sym], fixups: List[Fixup] } end
-type Strs = SNil | SCons(String, Strs) end
-type Asm1 = { off: Int, locals: Map[Int], syms: List[Sym] } end
-type Asm2 = { off: Int, pieces: Strs, fixups: List[Fixup] } end
-
-fn item_size(c: Code) -> Int
-  match c
-    case CB(l) -> list_len(l)
-    case CS(s) -> str_len(s)
-    case CRel(_) -> 4
-    case CA32(_) -> 4
-    case CA64(_) -> 8
-    case _ -> 0
-  end
+# C call with the arguments already in the ABI registers
+fn x_craw(t: Target, sym: String) -> Code
+  let shadow = if eq(t.os, "windows") then x_alu_imm(5, rsp, 32) else [] end
+  cat([CB(cat3(x_mov(rbx, rsp), x_alu_imm(4, rsp, -16), shadow)), x_rip([255, 21], imp_label(sym)), CB(x_mov(rsp, rbx))])
 end
 
-fn pass1(items: Items, a: Asm1) -> Asm1
-  match items
-    case INil -> a
-    case ICons(CLab(l), rest) ->
-      if str_starts(l, ".") then pass1(rest, { a with locals: map.set(a.locals, l, a.off) })
-      else pass1(rest, { a with syms: list_push(a.syms, Sym { name: l, off: a.off }), locals: map.set(a.locals, l, a.off) }) end
-    case ICons(c, rest) -> pass1(rest, { a with off: add(a.off, item_size(c)) })
-  end
-end
-
-let zero4 = str_from_bytes([0, 0, 0, 0])
-let zero8 = str_from_bytes([0, 0, 0, 0, 0, 0, 0, 0])
-
-fn pass2(items: Items, locals: Map[Int], a: Asm2) -> Asm2
-  match items
-    case INil -> a
-    case ICons(c, rest) ->
-      let n = item_size(c)
-      let next = match c
-        case CB(l) -> { a with pieces: SCons(str_from_bytes(l), a.pieces) }
-        case CS(s) -> { a with pieces: SCons(s, a.pieces) }
-        case CRel(l) ->
-          match map.get(locals, l)
-            case Some(t) -> { a with pieces: SCons(str_from_bytes(lebytes(sub(t, add(a.off, 4)), 4)), a.pieces) }
-            case None -> { a with pieces: SCons(zero4, a.pieces), fixups: list_push(a.fixups, Fixup { off: a.off, kind: 0, sym: l }) }
-          end
-        case CA32(l) -> { a with pieces: SCons(zero4, a.pieces), fixups: list_push(a.fixups, Fixup { off: a.off, kind: 1, sym: l }) }
-        case CA64(l) -> { a with pieces: SCons(zero8, a.pieces), fixups: list_push(a.fixups, Fixup { off: a.off, kind: 2, sym: l }) }
-        case _ -> a
-      end
-      pass2(rest, locals, { next with off: add(a.off, n) })
-  end
-end
-
-fn strs_reverse(s: Strs, acc: Strs) -> Strs
-  match s
-    case SNil -> acc
-    case SCons(x, rest) -> strs_reverse(rest, SCons(x, acc))
-  end
-end
-
-fn strs_pairs(s: Strs, acc: Strs) -> Strs
-  match s
-    case SNil -> strs_reverse(acc, SNil)
-    case SCons(a, SNil) -> strs_reverse(SCons(a, acc), SNil)
-    case SCons(a, SCons(b, rest)) -> strs_pairs(rest, SCons(str_cat(a, b), acc))
-  end
-end
-
-# concatenates many strings in O(total * log count) by merging neighbours pairwise
-fn join_all(s: Strs) -> String
-  match s
-    case SNil -> ""
-    case SCons(a, SNil) -> a
-    case _ -> join_all(strs_pairs(s, SNil))
-  end
-end
-
-fn assemble(c: Code) -> Blob
-  let items = flatten(c, INil)
-  let a1 = pass1(items, Asm1 { off: 0, locals: map.empty(), syms: [] })
-  let a2 = pass2(items, a1.locals, Asm2 { off: 0, pieces: SNil, fixups: [] })
-  Blob { bytes: join_all(strs_reverse(a2.pieces, SNil)), syms: a1.syms, fixups: a2.fixups }
-end
-
-# ---------- linking into an ELF executable ----------
-
-let base_addr = 4194304
-let header_size = 120
-
-type Placed = { addr: Int, blob: Blob } end
-type Layout = { addr: Int, placed: List[Placed], syms: Map[Int] } end
-
-fn pad_to8(n: Int) -> Int
-  mul(div(add(n, 7), 8), 8)
-end
-
-fn layout(blobs: List[Blob]) -> Layout
-  list_fold(blobs, Layout { addr: add(base_addr, header_size), placed: [], syms: map.empty() }, fn(acc, b)
-    let syms = list_fold(b.syms, acc.syms, fn(m, s) map.set(m, s.name, add(acc.addr, s.off)) end)
-    Layout { addr: pad_to8(add(acc.addr, str_len(b.bytes))), placed: list_push(acc.placed, Placed { addr: acc.addr, blob: b }), syms: syms }
+fn x_tail(n: Int, m: Int) -> List[Int]
+  let base = sub(add(16, mul(8, m)), mul(8, n))
+  let moves = list_fold(list_reverse(list_range(0, n)), [], fn(acc, j)
+    list_concat(acc, list_concat(x_load(rax, rsp, mul(8, j)), x_store(rbp, add(base, mul(8, j)), rax)))
   end)
+  cat3(list_concat(x_load(rcx, rbp, 8), x_load(rdx, rbp, 0)), moves,
+    cat3(x_lea(rsp, rbp, sub(base, 8)), x_store(rsp, 0, rcx), x_mov(rbp, rdx)))
 end
 
-type Patch = { pos: Int, out: Strs, missing: List[String] } end
-
-fn patch_blob(p: Placed, syms: Map[Int], st: Patch) -> Patch
-  let r = list_fold(p.blob.fixups, Patch { pos: 0, out: st.out, missing: st.missing }, fn(acc, f)
-    let before = SCons(str_slice(p.blob.bytes, acc.pos, f.off), acc.out)
-    match map.get(syms, f.sym)
-      case None -> Patch { pos: add(f.off, item_size_kind(f.kind)), out: SCons(if eq(f.kind, 2) then zero8 else zero4 end, before), missing: list_push(acc.missing, f.sym) }
-      case Some(t) ->
-        let v = if eq(f.kind, 0) then lebytes(sub(t, add(add(p.addr, f.off), 4)), 4) elif eq(f.kind, 1) then lebytes(t, 4) else lebytes(t, 8) end
-        Patch { pos: add(f.off, list_len(v)), out: SCons(str_from_bytes(v), before), missing: acc.missing }
-    end
-  end)
-  let size = str_len(p.blob.bytes)
-  let tail = SCons(str_slice(p.blob.bytes, r.pos, size), r.out)
-  let pad = sub(pad_to8(add(p.addr, size)), add(p.addr, size))
-  { r with out: SCons(str_repeat(str_from_bytes([0]), pad), tail) }
-end
-
-fn item_size_kind(k: Int) -> Int
-  if eq(k, 2) then 8 else 4 end
-end
-
-fn elf_header(entry: Int, total: Int) -> String
-  let ident = [127, 69, 76, 70, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  let eh = list_concat(ident, list_concat(list_concat(list_concat(lebytes(2, 2), lebytes(62, 2)), list_concat(lebytes(1, 4), lebytes(entry, 8))),
-    list_concat(list_concat(lebytes(64, 8), lebytes(0, 8)), list_concat(list_concat(lebytes(0, 4), lebytes(64, 2)), list_concat(list_concat(lebytes(56, 2), lebytes(1, 2)), list_concat(lebytes(64, 2), list_concat(lebytes(0, 2), lebytes(0, 2))))))))
-  let ph = list_concat(list_concat(list_concat(lebytes(1, 4), lebytes(7, 4)), list_concat(lebytes(0, 8), lebytes(base_addr, 8))),
-    list_concat(list_concat(lebytes(base_addr, 8), lebytes(total, 8)), list_concat(lebytes(total, 8), lebytes(4096, 8))))
-  str_from_bytes(list_concat(eh, ph))
-end
-
-type Image = { bytes: String, missing: List[String] } end
-
-fn link_image(blobs: List[Blob], entry: String) -> Image
-  let lay = layout(blobs)
-  let p = list_fold(lay.placed, Patch { pos: 0, out: SNil, missing: [] }, fn(acc, pl) patch_blob(pl, lay.syms, acc) end)
-  let total = sub(lay.addr, base_addr)
-  let entry_addr = unwrap_or(map.get(lay.syms, entry), 0)
-  let body = join_all(strs_reverse(p.out, SNil))
-  Image { bytes: str_cat(elf_header(entry_addr, total), body), missing: p.missing }
+fn lower_x64(t: Target, i: Ins) -> Code
+  match i
+    case IMovI(r, n) -> CB(x_movi(r, n))
+    case IMov(d, s) -> CB(x_mov(d, s))
+    case ILd(d, b, o) -> CB(x_load(d, b, o))
+    case ISt(b, o, s) -> CB(x_store(b, o, s))
+    case ILdB(d, b, o) -> CB(list_concat([rex(true, d, 0, b), 15, 182], mem(d, b, o)))
+    case IStB(b, o, s) -> CB(list_concat([rex(false, s, 0, b), 136], mem(s, b, o)))
+    case ILea(d, b, o) -> CB(x_lea(d, b, o))
+    case IAlu(op, d, s) -> CB(x_op_rr(op, d, s))
+    case IAluI(op, r, n) -> CB(x_alu_imm(op, r, n))
+    case IShI(op, r, n) -> CB(x_shift(op, r, n))
+    case IShCl(op, r) -> CB([rex(true, 0, 0, r), 211, modrm(3, op, r)])
+    case IMul(d, s) -> CB([rex(true, d, 0, s), 15, 175, modrm(3, d, s)])
+    case IDiv -> CB([72, 153, rex(true, 0, 0, r8), 247, modrm(3, 7, r8)])
+    case IPush(r) -> CB(x_push(r))
+    case IPop(r) -> CB(x_pop(r))
+    case ITst1(r) -> CB([246, modrm(3, 0, r), 1])
+    case ICmpBM(b, o, imm) -> CB(list_concat(x_mem_op([128], 7, b, o), [imm]))
+    case ICmpM(b, o, imm) -> CB(cat3([rex(true, 0, 0, b), 129], mem(7, b, o), lebytes(imm, 4)))
+    case ICallM(b, o) -> CB(x_mem_op([255], 2, b, o))
+    case IJmpM(b, o) -> CB(x_mem_op([255], 4, b, o))
+    case ISys -> CB([15, 5])
+    case ICopyB -> CB([243, 164])
+    case ICopyQ -> CB([243, 72, 165])
+    case IEnter -> CB(list_concat(x_push(rbp), x_mov(rbp, rsp)))
+    case ILeave(n) -> CB(cat3(x_mov(rsp, rbp), x_pop(rbp), x_ret(n)))
+    case ITail(n, m) -> CB(x_tail(n, m))
+    case IAddr(r, l) -> x_rip([rex(true, r, 0, 0), 141, modrm(0, r, 5)], l)
+    case ILdG(r, l) -> x_rip([rex(true, r, 0, 0), 139, modrm(0, r, 5)], l)
+    case IStG(l, r) -> x_rip([rex(true, r, 0, 0), 137, modrm(0, r, 5)], l)
+    case ICall(l) -> x_rip([232], l)
+    case IJmp(l) -> x_rip([233], l)
+    case IJcc(c, l) -> x_rip([15, add(128, c)], l)
+    case ICCall(sym, n, r32) -> x_ccall(t, sym, n, r32)
+    case ICRaw(sym) -> x_craw(t, sym)
+    case ISxtw -> CB([72, 99, 192])
+  end
 end

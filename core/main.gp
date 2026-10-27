@@ -1,8 +1,9 @@
 # kaizo — the GPLM core: checker and native x86-64 compiler, written in GPLM.
 
-let version = "1.0.0-dev"
+let version = "1.1.0-dev"
+let host_target = target()
 
-let usage = "kaizo 1.0.0-dev - GPLM core (native, self-hosted)\n\nusage:\n  kaizo run   <file.gp|dir> [args...]   check, compile, run fn main\n  kaizo check <file.gp|dir> [--json]    static checks only\n  kaizo test  <file.gp|dir>             compile and run test blocks\n  kaizo build <file.gp|dir> -o <out>    native executable\n  kaizo version\n"
+let usage = "kaizo 1.0.0-dev - GPLM core (native, self-hosted)\n\nusage:\n  kaizo run   <file.gp|dir> [args...]   check, compile, run fn main\n  kaizo check <file.gp|dir> [--json]    static checks only\n  kaizo test  <file.gp|dir>             compile and run test blocks\n  kaizo build <file.gp|dir> -o <out>    native executable\n\noptions:\n  --target linux-x64|windows-x64|macos-x64|macos-arm64   (default: the host)\n  kaizo version\n"
 
 fn json_str(s: String) -> String
   let b = str_from_bytes([92])
@@ -29,8 +30,8 @@ fn print_diags(ds: List[Diag], json: Bool) -> Unit ! [io]
 end
 
 # collect + link + check; prints diagnostics on failure
-fn load(path: String, json: Bool) -> Option[Program] ! [io, fs]
-  match collect(path)
+fn load(path: String, json: Bool, t: Target) -> Option[Program] ! [io, fs]
+  match collect(path, t)
     case Err(e) ->
       println(str_cat("error: ", e))
       None
@@ -55,7 +56,27 @@ fn positional(args: List[String]) -> List[String]
   match args
     case [] -> []
     case ["-o", _, ..rest] -> positional(rest)
+    case ["--target", _, ..rest] -> positional(rest)
     case [a, ..rest] -> if str_starts(a, "--") then positional(rest) else list_cons(a, positional(rest)) end
+  end
+end
+
+fn host() -> Target
+  unwrap_or(find_target(host_target), Target { name: "linux-x64", os: "linux", arch: "x64" })
+end
+
+# --target NAME, or the host; an unknown name is reported and kaizo exits
+fn target_arg(args: List[String]) -> Target
+  match flag_value(args, "--target")
+    case None -> host()
+    case Some(name) -> unwrap_or(find_target(name), host())
+  end
+end
+
+fn write_image(t: Target, o: Out) -> Image
+  if eq(t.os, "windows") then write_pe(o)
+  elif eq(t.os, "macos") then write_macho(t, o)
+  else write_elf(o)
   end
 end
 
@@ -63,7 +84,7 @@ fn cmd_check(rest: List[String]) -> Unit ! [io, fs]
   let json = list_contains(rest, "--json")
   match positional(rest)
     case [path] ->
-      match load(path, json)
+      match load(path, json, target_arg(rest))
         case Some(_) -> println(if json then "[]" else "ok" end)
         case None -> exit(1)
       end
@@ -119,8 +140,8 @@ fn read_embeds(paths: List[String], m: Map[String]) -> Result[Map[String], Strin
 end
 
 # check + generate; None after printing errors
-fn compile(path: String, mode: Mode) -> Option[String] ! [io, fs]
-  match load(path, false)
+fn compile(path: String, mode: Mode, t: Target) -> Option[String] ! [io, fs]
+  match load(path, false, t)
     case None -> None
     case Some(prog) ->
       match read_embeds(embed_paths(prog), map.empty())
@@ -128,7 +149,7 @@ fn compile(path: String, mode: Mode) -> Option[String] ! [io, fs]
           println(str_cat("error: ", e))
           None
         case Ok(embeds) ->
-          let img = gen_program(prog, embeds, mode)
+          let img = write_image(t, gen_program(prog, embeds, mode, t))
           if gt(list_len(img.missing), 0) then
             println(str_cat("internal error: unresolved symbols: ", str_join(list_slice(img.missing, 0, 10), ", ")))
             None
@@ -143,7 +164,7 @@ fn cmd_build(rest: List[String]) -> Unit ! [io, fs]
       match flag_value(rest, "-o")
         case None -> fail_usage()
         case Some(out) ->
-          match compile(path, AppMode)
+          match compile(path, AppMode, target_arg(rest))
             case None -> exit(1)
             case Some(bin) ->
               match write_file(out, bin, 493)
@@ -161,7 +182,7 @@ end
 fn cmd_run(rest: List[String]) -> Unit ! [io, fs, proc]
   match rest
     case [path, ..app_args] ->
-      match compile(path, AppMode)
+      match compile(path, AppMode, host())
         case None -> exit(1)
         case Some(bin) ->
           match run_image(bin, app_args)
@@ -178,7 +199,7 @@ end
 fn cmd_test(rest: List[String]) -> Unit ! [io, fs, proc]
   match positional(rest)
     case [path] ->
-      match compile(path, TestMode(path))
+      match compile(path, TestMode(path), host())
         case None -> exit(1)
         case Some(bin) ->
           match run_image(bin, [])

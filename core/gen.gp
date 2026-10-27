@@ -55,8 +55,7 @@ fn gen_init(cx: Cx, g: G) -> G
       end)
     end)
   end)
-  let prologue = list_concat(list_concat(push_r(rbp), mov_rr(rbp, rsp)), alu_imm(5, rsp, mul(8, body.slot)))
-  let f = cat([CLab("init"), CB(prologue), body.code, CB(list_concat(list_concat(mov_rr(rsp, rbp), pop_r(rbp)), ret_n(0)))])
+  let f = cat([CLab("init"), CI([IEnter, IAluI(5, rsp, mul(8, body.slot))]), body.code, CI([ILeave(0)])])
   { body with funcs: list_push(body.funcs, f), code: g.code, slot: g.slot }
 end
 
@@ -128,49 +127,94 @@ end
 
 type GW = { g: G, words: List[Code] } end
 
-let sa_restorer = 67108864
+# ---------- runtime data and entry points ----------
 
 fn gen_runtime_data(g: G) -> G
   emit_data(g, cat([
     CLab("TRUE"), CB(list_concat(lebytes(5, 8), lebytes(1, 8))),
     CLab("FALSE"), CB(list_concat(lebytes(5, 8), lebytes(0, 8))),
-    CLab("argv_base"), CB(lebytes(0, 8)),
-    CLab("termios_ptr"), CB(lebytes(0, 8)),
-    CLab("sigact"), CA64("sighandler"), CB(lebytes(sa_restorer, 8)), CA64("sighandler"), CB(lebytes(0, 8)),
-    CLab("sigign"), CB(list_concat(list_concat(lebytes(1, 8), lebytes(0, 8)), list_concat(lebytes(0, 8), lebytes(0, 8)))),
+    CLab("g_argc"), CB(lebytes(0, 8)), CLab("g_argv"), CB(lebytes(0, 8)), CLab("g_envp"), CB(lebytes(0, 8)),
+    CLab("termios_ptr"), CB(lebytes(0, 8)), CLab("sig_num"), CB(lebytes(0, 8)),
+    CLab("heap_base"), CB(lebytes(0, 8)), CLab("heap_end"), CB(lebytes(0, 8)), CLab("ctrl_tmp"), CB(lebytes(0, 16)),
+    CLab("sigact"), CA64("sighandler"), CB(lebytes(67108864, 8)), CA64("sighandler"), CB(lebytes(0, 8)),
+    CLab("sigign"), CB(lebytes(1, 32)),
     CLab("cursor_on"), CB([27, 91, 63, 50, 53, 104, 0, 0])
   ]))
-end
-
-fn sys_mmap(size: Int) -> List[Int]
-  list_concat(list_concat(list_concat(mov_imm32(rax, 9), mov_imm32(rdi, 0)), list_concat(mov_imm64(rsi, size), mov_imm32(rdx, 3))),
-    list_concat(list_concat(mov_imm32(r10, 16418), mov_imm64(r8, -1)), list_concat(mov_imm32(r9, 0), syscall_op)))
-end
-
-fn sigaction_code(sig: Int, act: String) -> Code
-  cat([CB(list_concat(mov_imm32(rax, 13), mov_imm32(rdi, sig))), mov_addr(rsi, act), CB(list_concat(list_concat(mov_imm32(rdx, 0), mov_imm32(r10, 8)), syscall_op))])
 end
 
 let heap_size = 68719476736
 let stack_size = 1073741824
 
-fn gen_start(g: G, mode: Mode) -> G
-  let call_main = match mode
-    case AppMode -> call_l(fn_label(main_module, "main"))
-    case TestMode(path) -> cat([mov_addr(rax, "t:test_path"), CB(push_r(rax)), mov_addr(rax, "t:test_names"), CB(push_r(rax)), mov_addr(rax, "t:test_fns"), CB(push_r(rax)), call_l(fn_label(rt_module, "run_tests"))])
+# argument registers of the platform C ABI, as IR registers
+fn abi_args(t: Target) -> List[Int]
+  if eq(t.arch, "arm64") then [rax, rcx, rdx, rsi, rdi, r8, r9, r10]
+  elif eq(t.os, "windows") then [rcx, rdx, r8, r9]
+  else [rdi, rsi, rdx, rcx, r8, r9]
   end
-  let start = cat([CLab("_start"), store_abs("argv_base", rsp),
-    CB(list_concat(sys_mmap(heap_size), mov_rr(r14, rax))),
-    CB(list_concat(list_concat(sys_mmap(stack_size), alu_imm(0, rax, stack_size)), mov_rr(rsp, rax))),
-    sigaction_code(2, "sigact"), sigaction_code(15, "sigact"), sigaction_code(13, "sigign"),
-    call_l("init"), call_main,
-    CB(list_concat(list_concat(mov_imm32(rax, 231), mov_imm32(rdi, 0)), syscall_op))])
-  let skip = ".sigskip"
-  let handler = cat([CLab("sighandler"), CB(mov_rr(12, rdi)), load_abs(rdx, "termios_ptr"), CB(op_rr(133, rdx, rdx)), jcc(cc_e, skip),
-    CB(list_concat(list_concat(mov_imm32(rax, 16), mov_imm32(rdi, 0)), list_concat(mov_imm32(rsi, 21506), syscall_op))),
-    CB(list_concat(mov_imm32(rax, 1), mov_imm32(rdi, 1))), mov_addr(rsi, "cursor_on"), CB(list_concat(mov_imm32(rdx, 6), syscall_op)),
-    CLab(skip), CB(list_concat(list_concat(mov_rr(rdi, 12), alu_imm(0, rdi, 128)), list_concat(mov_imm32(rax, 231), syscall_op)))])
-  { g with funcs: list_push(list_push(g.funcs, start), handler) }
+end
+
+fn arg_reg(t: Target, i: Int) -> Int
+  unwrap_or(list_get(abi_args(t), i), rax)
+end
+
+# raw C call with immediate arguments
+fn craw(t: Target, sym: String, args: List[Int]) -> List[Ins]
+  list_push(list_map(list_range(0, list_len(args)), fn(i) IMovI(arg_reg(t, i), unwrap_or(list_get(args, i), 0)) end), ICRaw(sym))
+end
+
+# data pointers (CA64) were linked for the preferred address; add the load slide (macOS ASLR)
+fn self_reloc() -> Code
+  cat([CI([IAddr(rax, "data_start"), ILdG(rcx, "data_start_link"), IAlu(41, rax, rcx), IAluI(7, rax, 0)]), jcc(cc_e, ".rel_done"),
+    CI([IAddr(rdx, "reloc_table"), ILd(rcx, rdx, 0), IAddr(rsi, "data_start")]),
+    CLab(".rel_loop"), CI([IAluI(7, rcx, 0)]), jcc(cc_e, ".rel_done"),
+    CI([IAluI(0, rdx, 8), ILd(rdi, rdx, 0), IAlu(1, rdi, rsi), ILd(r8, rdi, 0), IAlu(1, r8, rax), ISt(rdi, 0, r8), IAluI(5, rcx, 1)]),
+    jmp(".rel_loop"), CLab(".rel_done")])
+end
+
+fn call_main(mode: Mode) -> Code
+  match mode
+    case AppMode -> call_l(fn_label(main_module, "main"))
+    case TestMode(_) -> cat([mov_addr(rax, "t:test_path"), CI(push_r(rax)), mov_addr(rax, "t:test_names"), CI(push_r(rax)),
+      mov_addr(rax, "t:test_fns"), CI(push_r(rax)), call_l(fn_label(rt_module, "run_tests"))])
+  end
+end
+
+fn sys_mmap(size: Int) -> List[Ins]
+  [IMovI(rax, 9), IMovI(rdi, 0), IMovI(rsi, size), IMovI(rdx, 3), IMovI(r10, 16418), IMovI(r8, -1), IMovI(r9, 0), ISys]
+end
+
+fn start_linux(mode: Mode) -> List[Code]
+  let start = cat([CLab("_start"),
+    CI([IMov(rax, rsp), ILd(rcx, rax, 0), IStG("g_argc", rcx), ILea(rdx, rax, 8), IStG("g_argv", rdx),
+      IMov(rdx, rcx), IShI(4, rdx, 3), IAlu(1, rdx, rax), IAluI(0, rdx, 16), IStG("g_envp", rdx)]),
+    self_reloc(),
+    CI(list_push(sys_mmap(heap_size), IMov(r14, rax))),
+    CI(list_concat(sys_mmap(stack_size), [IAluI(0, rax, stack_size), IMov(rsp, rax)])),
+    linux_sigaction(2, "sigact"), linux_sigaction(15, "sigact"), linux_sigaction(13, "sigign"),
+    call_l("init"), call_main(mode), CI([IMovI(rax, 231), IMovI(rdi, 0), ISys])])
+  let handler = cat([CLab("sighandler"), CI([IStG("sig_num", rdi), ILdG(rdx, "termios_ptr"), IAlu(133, rdx, rdx)]), jcc(cc_e, ".sigskip"),
+    CI([IMovI(rax, 16), IMovI(rdi, 0), IMovI(rsi, 21506), ISys, IMovI(rax, 1), IMovI(rdi, 1), IAddr(rsi, "cursor_on"), IMovI(rdx, 6), ISys]),
+    CLab(".sigskip"), CI([ILdG(rdi, "sig_num"), IAluI(0, rdi, 128), IMovI(rax, 231), ISys])])
+  [start, handler]
+end
+
+fn linux_sigaction(sig: Int, act: String) -> Code
+  CI([IMovI(rax, 13), IMovI(rdi, sig), IAddr(rsi, act), IMovI(rdx, 0), IMovI(r10, 8), ISys])
+end
+
+fn entry_code(t: Target, mode: Mode) -> List[Code]
+  if eq(t.os, "linux") then start_linux(mode)
+  elif eq(t.os, "windows") then start_windows(t, mode)
+  else start_macos(t, mode)
+  end
+end
+
+# symbols the entry code imports (besides the ones the runtime uses)
+fn entry_imports(t: Target) -> List[String]
+  if eq(t.os, "windows") then ["VirtualAlloc", "AddVectoredExceptionHandler", "SetConsoleCtrlHandler", "SetConsoleOutputCP", "ExitProcess", "GetStdHandle", "SetConsoleMode", "WriteFile"]
+  elif eq(t.os, "macos") then ["mmap", "signal", "tcsetattr", "write", "_exit", "exit"]
+  else []
+  end
 end
 
 fn gen_tests(cx: Cx, g: G, path: String) -> G
@@ -186,16 +230,30 @@ end
 
 type TG = { g: G, k: Int, names: List[Code], fns: List[Code] } end
 
-fn gen_program(p: Program, embeds: Map[String], mode: Mode) -> Image
-  let cx = Cx { prog: p, mod: get_module(p, main_module), nargs: 0, fields: field_table(p), rec_ids: record_ids(p), embeds: embeds }
-  let g0 = G { code: CNil, slot: 1, lab: 0, data: CNil, funcs: [], wrappers: [], strs: map.empty() }
+type Out = { text: List[Blob], data: List[Blob], imports: List[String] } end
+
+fn gen_program(p: Program, embeds: Map[String], mode: Mode, t: Target) -> Out
+  let cx = Cx { prog: p, mod: get_module(p, main_module), nargs: 0, fields: field_table(p), rec_ids: record_ids(p), embeds: embeds, target: t }
+  let g0 = G { code: CNil, slot: 1, lab: 0, data: CLab("data_start"), funcs: [], wrappers: [], strs: map.empty(), imports: entry_imports(t) }
   let g1 = list_fold(p.order, g0, fn(acc, name) gen_fns(cx, acc, get_module(p, name)) end)
   let g2 = gen_init(cx, g1)
   let g3 = match mode
     case TestMode(path) -> gen_tests(cx, g2, path)
     case AppMode -> g2
   end
-  let g4 = gen_start(gen_runtime_data(gen_tables(gen_wrappers(cx, g3, []), p)), mode)
-  let blobs = list_push(list_map(g4.funcs, assemble), assemble(g4.data))
-  link_image(blobs, "_start")
+  let g4 = gen_runtime_data(gen_tables(gen_wrappers(cx, g3, []), p))
+  let text = list_map(list_concat(g4.funcs, entry_code(t, mode)), fn(c) assemble(t, c) end)
+  let data = assemble(t, g4.data)
+  let rel = list_filter(data.fixups, fn(f) eq(f.kind, 2) end)
+  let reloc = assemble(t, cat(list_concat([CLab("data_start_link"), CA64("data_start"), CLab("reloc_table"), CB(lebytes(list_len(rel), 8))],
+    list_map(rel, fn(f) CB(lebytes(f.off, 8)) end))))
+  Out { text: text, data: [data, reloc], imports: g4.imports }
+end
+
+fn start_windows(t: Target, mode: Mode) -> List[Code]
+  []
+end
+
+fn start_macos(t: Target, mode: Mode) -> List[Code]
+  []
 end

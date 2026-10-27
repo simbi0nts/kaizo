@@ -15,6 +15,22 @@ let rt_module = "rt"
 let prelude_module = "prelude"
 let prelude_src = embed_file("rt/prelude.gp")
 let rt_src = embed_file("rt/rt.gp")
+let os_linux_src = embed_file("rt/os_linux.gp")
+let os_windows_src = embed_file("rt/os_windows.gp")
+let os_macos_src = embed_file("rt/os_macos.gp")
+let macos_x64_src = embed_file("rt/macos_x64.gp")
+let macos_arm64_src = embed_file("rt/macos_arm64.gp")
+
+# runtime module sources for a target: portable part + OS layer (+ arch-specific bits)
+fn rt_sources(t: Target) -> List[Source]
+  let base = [Source { path: "<rt>", src: rt_src }]
+  if eq(t.os, "windows") then list_push(base, Source { path: "<os_windows>", src: os_windows_src })
+  elif eq(t.os, "macos") then
+    let arch = if eq(t.arch, "arm64") then Source { path: "<macos_arm64>", src: macos_arm64_src } else Source { path: "<macos_x64>", src: macos_x64_src } end
+    list_push(list_push(base, Source { path: "<os_macos>", src: os_macos_src }), arch)
+  else list_push(base, Source { path: "<os_linux>", src: os_linux_src })
+  end
+end
 
 let effect_names = ["io", "term", "time", "net", "fs", "proc"]
 
@@ -48,7 +64,7 @@ let prim_list = [
   b("prim_byte", 2, ""), b("prim_set_byte", 3, ""), b("prim_str_new", 1, ""), b("prim_list_new", 1, ""),
   b("prim_list_view", 3, ""), b("prim_record_copy", 1, ""), b("prim_addr", 1, ""), b("prim_peek", 1, ""),
   b("prim_syscall", 7, ""), b("prim_ctor_name", 1, ""), b("prim_record_name", 1, ""), b("prim_field_name", 2, ""),
-  b("prim_argv", 0, ""), b("prim_handle", 1, ""), b("prim_term_save", 1, ""), b("prim_peek8", 1, ""), b("prim_copy", 5, "")
+  b("prim_argc", 0, ""), b("prim_argv", 0, ""), b("prim_envp", 0, ""), b("prim_ccall", 2, ""), b("prim_ccall32", 2, ""), b("prim_handle", 1, ""), b("prim_term_save", 1, ""), b("prim_peek8", 1, ""), b("prim_copy", 5, "")
 ]
 
 fn table(l: List[Builtin]) -> Map[Builtin]
@@ -178,12 +194,12 @@ fn collect_imports(imps: List[ImportDecl], queue: List[ModSrc], c: Collected, di
 end
 
 # reads the app at root and every library it imports (transitively)
-fn collect(root: String) -> Result[Collected, String] ! [io, fs]
+fn collect(root: String, t: Target) -> Result[Collected, String] ! [io, fs]
   match gp_files(root)
     case Err(e) -> Err(e)
     case Ok(files) ->
       let main = ModSrc { name: main_module, files: files }
-      let rt = ModSrc { name: rt_module, files: [Source { path: "<rt>", src: rt_src }] }
+      let rt = ModSrc { name: rt_module, files: rt_sources(t) }
       Ok(collect_loop([main, rt], Collected { mods: [main, rt], diags: [] }, lib_dirs(root)))
   end
 end

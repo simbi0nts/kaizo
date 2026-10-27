@@ -1,16 +1,9 @@
 # Runtime of native GPLM programs, written in GPLM. Embedded into the kaizo binary and compiled
-# into every program as module `rt`. It implements every non-inline builtin on top of the
-# prim_* intrinsics (see codegen.gp) and raw Linux syscalls. No libc.
+# into every program as module `rt`, together with one OS layer (os_linux.gp, os_windows.gp,
+# os_macos.gp) that provides the os_* functions. Builtins are implemented here on top of the
+# prim_* intrinsics (see codegen.gp) and the OS layer.
 
 # ---------- low level ----------
-
-fn sys(n: Int, a: Int, b: Int, c: Int) -> Int
-  prim_syscall(n, a, b, c, 0, 0, 0)
-end
-
-fn sys5(n: Int, a: Int, b: Int, c: Int, d: Int, e: Int) -> Int
-  prim_syscall(n, a, b, c, d, e, 0)
-end
 
 fn holder(n: Int) -> List[Unit]
   let h = prim_list_new(n)
@@ -29,14 +22,6 @@ let state = holder(3)
 
 fn cstr(s: String) -> String
   str_cat(s, str_from_bytes([0]))
-end
-
-fn write_all(fd: Int, s: String, off: Int) -> Int
-  let n = prim_len(s)
-  if ge(off, n) then 0 else
-    let w = sys(1, fd, add(prim_addr(s), off), sub(n, off))
-    if lt(w, 0) then w else write_all(fd, s, add(off, w)) end
-  end
 end
 
 fn u_le(s: String, off: Int, k: Int) -> Int
@@ -62,34 +47,16 @@ fn fill_zero(s: String, i: Int, n: Int) -> String
   end
 end
 
-fn errno_msg(r: Int) -> String
-  match sub(0, r)
-    case 2 -> "no such file or directory"
-    case 9 -> "bad file descriptor"
-    case 11 -> "resource temporarily unavailable"
-    case 13 -> "permission denied"
-    case 17 -> "file exists"
-    case 20 -> "not a directory"
-    case 21 -> "is a directory"
-    case 32 -> "broken pipe"
-    case 98 -> "address already in use"
-    case 99 -> "cannot assign requested address"
-    case 104 -> "connection reset by peer"
-    case 110 -> "i/o timeout"
-    case e -> str_cat("errno ", show(e))
-  end
-end
-
 # ---------- failure ----------
 
 fn restore_quiet() -> Unit
   match prim_slot(state, 0)
     case Unit -> Unit
     case saved ->
-      sys(16, 0, 21506, prim_addr(saved))
+      os_term_set(saved)
       prim_slot_set_unit(0)
       prim_term_save(0)
-      write_all(1, "\e[?25h", 0)
+      os_write(1, "\e[?25h")
       Unit
   end
 end
@@ -100,8 +67,8 @@ end
 
 fn fail(msg: String) -> Unit
   restore_quiet()
-  write_all(2, str_cat(msg, "\n"), 0)
-  sys(231, 1, 0, 0)
+  os_write(2, str_cat(msg, "\n"))
+  os_exit(1)
   Unit
 end
 
@@ -587,23 +554,22 @@ end
 
 fn print(s: String) -> Unit
   need(s, 1, "print", "String")
-  write_all(1, s, 0)
+  os_write(1, s)
   Unit
 end
 
 fn println(s: String) -> Unit
   need(s, 1, "println", "String")
-  write_all(1, str_cat(s, "\n"), 0)
+  os_write(1, str_cat(s, "\n"))
   Unit
 end
 
-fn read_line_loop(buf: String, acc: List[Int]) -> Option[String]
-  let n = sys(0, 0, prim_addr(buf), 1)
-  if le(n, 0) then
+fn read_line_loop(acc: List[Int]) -> Option[String]
+  let c = os_read_byte()
+  if lt(c, 0) then
     if eq(list_len(acc), 0) then None else Some(str_from_bytes(acc)) end
-  else
-    let c = prim_byte(buf, 0)
-    if eq(c, 10) then Some(str_from_bytes(trim_cr(acc))) else read_line_loop(buf, list_push(acc, c)) end
+  elif eq(c, 10) then Some(str_from_bytes(trim_cr(acc)))
+  else read_line_loop(list_push(acc, c))
   end
 end
 
@@ -615,8 +581,23 @@ fn trim_cr(acc: List[Int]) -> List[Int]
 end
 
 fn read_line() -> Option[String]
-  read_line_loop(zeros(1), [])
+  read_line_loop([])
 end
+
+fn args() -> List[String]
+  os_args()
+end
+
+fn env_get(name: String) -> Option[String]
+  os_env_get(name)
+end
+
+fn exit(code: Int) -> Unit
+  restore_quiet()
+  os_exit(code)
+end
+
+# ---------- helpers shared by the OS layers ----------
 
 fn cstring_len(addr: Int, i: Int) -> Int
   if eq(prim_peek8(add(addr, i)), 0) then i else cstring_len(addr, add(i, 1)) end
@@ -634,67 +615,83 @@ fn cstring_at(addr: Int) -> String
   cstring_fill(prim_str_new(n), addr, 0, n)
 end
 
-fn argc() -> Int
-  prim_peek(prim_argv())
+fn has_bit(b: Int, m: Int) -> Bool
+  ne(bit_and(b, m), 0)
 end
 
-fn args_loop(i: Int, n: Int, acc: List[String]) -> List[String]
-  if ge(i, n) then acc else args_loop(add(i, 1), n, list_push(acc, cstring_at(prim_peek(add(prim_argv(), mul(8, add(i, 1))))))) end
+# argv/envp handed over by the entry code (Linux, macOS)
+fn posix_args_loop(i: Int, n: Int, acc: List[String]) -> List[String]
+  if ge(i, n) then acc else posix_args_loop(add(i, 1), n, list_push(acc, cstring_at(prim_peek(add(prim_argv(), mul(8, i)))))) end
 end
 
-fn args() -> List[String]
-  args_loop(1, argc(), [])
+fn posix_args() -> List[String]
+  posix_args_loop(1, prim_argc(), [])
 end
 
-fn envp() -> Int
-  add(prim_argv(), mul(8, add(argc(), 2)))
-end
-
-fn env_loop(prefix: String, i: Int) -> Option[String]
-  let p = prim_peek(add(envp(), mul(8, i)))
+fn posix_env_loop(prefix: String, i: Int) -> Option[String]
+  let p = prim_peek(add(prim_envp(), mul(8, i)))
   if eq(p, 0) then None else
     let s = cstring_at(p)
-    if str_starts(s, prefix) then Some(str_slice(s, prim_len(prefix), prim_len(s))) else env_loop(prefix, add(i, 1)) end
+    if str_starts(s, prefix) then Some(str_slice(s, prim_len(prefix), prim_len(s))) else posix_env_loop(prefix, add(i, 1)) end
   end
 end
 
-fn env_get(name: String) -> Option[String]
-  env_loop(str_cat(name, "="), 0)
+fn posix_env_get(name: String) -> Option[String]
+  posix_env_loop(str_cat(name, "="), 0)
 end
 
-fn exit(code: Int) -> Unit
-  restore_quiet()
-  sys(231, code, 0, 0)
-  Unit
+fn ptr_array(cs: List[String]) -> String
+  let n = prim_len(cs)
+  let buf = zeros(mul(8, add(n, 1)))
+  list_fold(list_range(0, n), buf, fn(b, i)
+    put_le(b, mul(8, i), prim_addr(prim_slot(cs, i)), 8)
+    b
+  end)
+end
+
+fn parse_ip(parts: List[String], acc: List[Int]) -> Option[List[Int]]
+  match parts
+    case [] -> if eq(list_len(acc), 4) then Some(acc) else None end
+    case [p, ..rest] ->
+      match str_to_int(p)
+        case Some(v) -> if and(ge(v, 0), le(v, 255)) then parse_ip(rest, list_push(acc, v)) else None end
+        case None -> None
+      end
+  end
+end
+
+# sockaddr_in for "ip:port"; BSD (macOS) has a length byte before the family
+fn sockaddr(addr: String, bsd: Bool) -> Option[String]
+  match str_split(addr, ":")
+    case [host, port] ->
+      match str_to_int(port)
+        case None -> None
+        case Some(pn) ->
+          match parse_ip(str_split(if eq(host, "") then "0.0.0.0" else host end, "."), [])
+            case None -> None
+            case Some(ip) ->
+              let fam = if bsd then [16, 2] else [2, 0] end
+              Some(str_from_bytes(list_concat(list_concat(list_concat(fam, [div(pn, 256), mod(pn, 256)]), ip), [0, 0, 0, 0, 0, 0, 0, 0])))
+          end
+      end
+    case _ -> None
+  end
 end
 
 # ---------- terminal ----------
 
-fn has_bit(b: Int, m: Int) -> Bool
-  eq(mod(div(b, m), 2), 1)
-end
-
 fn term_raw() -> Result[Unit, String]
-  let t = zeros(64)
-  let r = sys(16, 0, 21505, prim_addr(t))
-  if lt(r, 0) then Err(str_cat("stdin is not a terminal: ", errno_msg(r))) else
-    let saved = str_slice(t, 0, 64)
-    match prim_slot(state, 0)
-      case Unit ->
-        prim_set_slot(state, 0, saved)
-        prim_term_save(saved)
-      case _ -> Unit
-    end
-    let lf = prim_byte(t, 12)
-    let lf2 = sub(sub(lf, if has_bit(lf, 2) then 2 else 0 end), if has_bit(lf, 8) then 8 else 0 end)
-    prim_set_byte(t, 12, lf2)
-    prim_set_byte(t, 22, 0)
-    prim_set_byte(t, 23, 0)
-    let r2 = sys(16, 0, 21506, prim_addr(t))
-    if lt(r2, 0) then Err(errno_msg(r2)) else
-      write_all(1, "\e[?25l", 0)
+  match os_term_raw()
+    case Err(e) -> Err(e)
+    case Ok(saved) ->
+      match prim_slot(state, 0)
+        case Unit ->
+          prim_set_slot(state, 0, saved)
+          prim_term_save(saved)
+        case _ -> Unit
+      end
+      os_write(1, "\e[?25l")
       Ok(Unit)
-    end
   end
 end
 
@@ -710,12 +707,11 @@ fn pending() -> String
 end
 
 fn term_key() -> String
-  let buf = zeros(64)
-  let n = match prim_slot(state, 0)
-    case Unit -> 0
-    case _ -> sys(0, 0, prim_addr(buf), 64)
+  let fresh = match prim_slot(state, 0)
+    case Unit -> ""
+    case _ -> os_term_read()
   end
-  let p = if gt(n, 0) then str_cat(pending(), str_slice(buf, 0, n)) else pending() end
+  let p = str_cat(pending(), fresh)
   let np = prim_len(p)
   if eq(np, 0) then "" else
     let c = prim_byte(p, 0)
@@ -743,212 +739,90 @@ end
 # ---------- time ----------
 
 fn now_ms() -> Int
-  let ts = zeros(16)
-  sys(228, 0, prim_addr(ts), 0)
-  add(mul(u_le(ts, 0, 8), 1000), div(u_le(ts, 8, 8), 1000000))
+  os_now_ms()
 end
 
 fn sleep_ms(n: Int) -> Unit
-  let ts = zeros(16)
-  put_le(ts, 0, div(max(0, n), 1000), 8)
-  put_le(ts, 8, mul(mod(max(0, n), 1000), 1000000), 8)
-  sys(35, prim_addr(ts), 0, 0)
-  Unit
+  os_sleep_ms(n)
 end
 
-# ---------- net ----------
-
-fn parse_ip(parts: List[String], acc: List[Int]) -> Option[List[Int]]
-  match parts
-    case [] -> if eq(list_len(acc), 4) then Some(acc) else None end
-    case [p, ..rest] ->
-      match str_to_int(p)
-        case Some(v) -> if and(ge(v, 0), le(v, 255)) then parse_ip(rest, list_push(acc, v)) else None end
-        case None -> None
-      end
-  end
-end
-
-fn sockaddr(addr: String) -> Option[String]
-  match str_split(addr, ":")
-    case [host, port] ->
-      match str_to_int(port)
-        case None -> None
-        case Some(pn) ->
-          match parse_ip(str_split(if eq(host, "") then "0.0.0.0" else host end, "."), [])
-            case None -> None
-            case Some(ip) -> Some(str_from_bytes(list_concat(list_concat([2, 0, div(pn, 256), mod(pn, 256)], ip), [0, 0, 0, 0, 0, 0, 0, 0])))
-          end
-      end
-    case _ -> None
-  end
-end
+# ---------- net (handles wrap OS socket numbers) ----------
 
 fn tcp_listen(addr: String) -> Result[Int, String]
-  match sockaddr(addr)
-    case None -> Err(str_cat("bad address (want ip:port): ", addr))
-    case Some(sa) ->
-      let fd = sys(41, 2, 524289, 0)
-      if lt(fd, 0) then Err(errno_msg(fd)) else
-        let one = str_from_bytes([1, 0, 0, 0])
-        sys5(54, fd, 1, 2, prim_addr(one), 4)
-        let r = sys(49, fd, prim_addr(sa), 16)
-        if lt(r, 0) then
-          sys(3, fd, 0, 0)
-          Err(str_join(["listen tcp ", addr, ": bind: ", errno_msg(r)], ""))
-        else
-          let r2 = sys(50, fd, 128, 0)
-          if lt(r2, 0) then Err(errno_msg(r2)) else Ok(prim_handle(fd)) end
-        end
-      end
+  match os_tcp_listen(addr)
+    case Ok(fd) -> Ok(prim_handle(fd))
+    case Err(e) -> Err(e)
   end
 end
 
 fn tcp_accept(l: Int) -> Result[Int, String]
-  let fd = sys(43, prim_id(l), 0, 0)
-  if lt(fd, 0) then Err(errno_msg(fd)) else Ok(prim_handle(fd)) end
-end
-
-fn tcp_read(c: Int, max_bytes: Int, timeout: Int) -> Result[String, String]
-  let fd = prim_id(c)
-  let pfd = zeros(8)
-  put_le(pfd, 0, fd, 4)
-  put_le(pfd, 4, 1, 2)
-  let pr = sys(7, prim_addr(pfd), 1, timeout)
-  if lt(pr, 0) then Err(errno_msg(pr))
-  elif eq(pr, 0) then Err("i/o timeout")
-  else
-    let n = clamp(max_bytes, 1, 1048576)
-    let buf = prim_str_new(n)
-    let r = sys(0, fd, prim_addr(buf), n)
-    if lt(r, 0) then Err(errno_msg(r)) else Ok(str_slice(buf, 0, r)) end
+  match os_tcp_accept(prim_id(l))
+    case Ok(fd) -> Ok(prim_handle(fd))
+    case Err(e) -> Err(e)
   end
 end
 
+fn tcp_read(c: Int, max_bytes: Int, timeout: Int) -> Result[String, String]
+  os_tcp_read(prim_id(c), clamp(max_bytes, 1, 1048576), timeout)
+end
+
 fn tcp_write(c: Int, s: String) -> Result[Unit, String]
-  let r = write_all(prim_id(c), s, 0)
-  if lt(r, 0) then Err(errno_msg(r)) else Ok(Unit) end
+  os_tcp_write(prim_id(c), s)
 end
 
 fn tcp_close(c: Int) -> Unit
-  sys(3, prim_id(c), 0, 0)
-  Unit
+  os_tcp_close(prim_id(c))
 end
 
 # ---------- files ----------
 
-fn read_chunks(fd: Int, acc: List[String]) -> Result[String, String]
-  let buf = prim_str_new(65536)
-  let n = sys(0, fd, prim_addr(buf), 65536)
-  if lt(n, 0) then Err(errno_msg(n))
-  elif eq(n, 0) then Ok(str_join(acc, ""))
-  else read_chunks(fd, list_push(acc, str_slice(buf, 0, n)))
-  end
-end
-
 fn read_file(path: String) -> Result[String, String]
-  let fd = sys(2, prim_addr(cstr(path)), 0, 0)
-  if lt(fd, 0) then Err(str_join(["open ", path, ": ", errno_msg(fd)], "")) else
-    let r = read_chunks(fd, [])
-    sys(3, fd, 0, 0)
-    r
-  end
+  os_read_file(path)
 end
 
 fn write_file(path: String, content: String, mode_bits: Int) -> Result[Unit, String]
-  let fd = sys(2, prim_addr(cstr(path)), 577, mode_bits)
-  if lt(fd, 0) then Err(str_join(["open ", path, ": ", errno_msg(fd)], "")) else
-    let w = write_all(fd, content, 0)
-    sys(91, fd, mode_bits, 0)
-    sys(3, fd, 0, 0)
-    if lt(w, 0) then Err(errno_msg(w)) else Ok(Unit) end
-  end
-end
-
-fn dirents(buf: String, off: Int, n: Int, acc: List[String]) -> List[String]
-  if ge(off, n) then acc else
-    let reclen = u_le(buf, add(off, 16), 2)
-    let name = cstring_at(add(prim_addr(buf), add(off, 19)))
-    let acc2 = if or(eq(name, "."), eq(name, "..")) then acc else list_push(acc, name) end
-    dirents(buf, add(off, reclen), n, acc2)
-  end
-end
-
-fn read_dir(fd: Int, acc: List[String]) -> Result[List[String], String]
-  let buf = prim_str_new(32768)
-  let n = sys(217, fd, prim_addr(buf), 32768)
-  if lt(n, 0) then Err(errno_msg(n))
-  elif eq(n, 0) then Ok(acc)
-  else read_dir(fd, dirents(buf, 0, n, acc))
-  end
+  os_write_file(path, content, mode_bits)
 end
 
 fn list_dir(path: String) -> Result[List[String], String]
-  let fd = sys(2, prim_addr(cstr(path)), 65536, 0)
-  if lt(fd, 0) then Err(str_join(["open ", path, ": ", errno_msg(fd)], "")) else
-    let r = read_dir(fd, [])
-    sys(3, fd, 0, 0)
-    match r
-      case Ok(names) -> Ok(list_sort(names))
-      case e -> e
-    end
+  match os_list_dir(path)
+    case Ok(names) -> Ok(list_sort(names))
+    case e -> e
   end
-end
-
-# ---------- processes ----------
-
-fn ptr_array(cs: List[String]) -> String
-  let n = prim_len(cs)
-  let buf = zeros(mul(8, add(n, 1)))
-  list_fold(list_range(0, n), buf, fn(b, i)
-    put_le(b, mul(8, i), prim_addr(prim_slot(cs, i)), 8)
-    b
-  end)
 end
 
 fn run_image(bin: String, argv: List[String]) -> Result[Unit, String]
-  let fd = sys(319, prim_addr(cstr("kaizo-app")), 0, 0)
-  if lt(fd, 0) then Err(str_cat("memfd_create: ", errno_msg(fd))) else
-    write_all(fd, bin, 0)
-    let cs = list_map(list_cons("app", argv), cstr)
-    let av = ptr_array(cs)
-    restore_quiet()
-    let r = prim_syscall(322, fd, prim_addr(cstr("")), prim_addr(av), envp(), 4096, 0)
-    Err(str_cat("execveat: ", errno_msg(r)))
-  end
+  restore_quiet()
+  os_run_image(bin, argv)
 end
 
-# ---------- tests: one forked child per test ----------
+# ---------- tests: each test runs in its own process ----------
 
 fn run_tests(path: String, names: List[String], fns: List[Fn() -> Unit]) -> Unit
-  let n = prim_len(names)
-  let failed = run_test_loop(names, fns, 0, n, 0)
-  println(str_join([path, ": ", show(sub(n, failed)), " passed, ", show(failed), " failed"], ""))
-  exit(if gt(failed, 0) then 1 else 0 end)
+  match os_test_mode()
+    case Some(i) ->
+      let f = prim_slot(fns, i)
+      f()
+      os_exit(0)
+    case None ->
+      let n = prim_len(names)
+      let failed = run_test_loop(names, fns, 0, n, 0)
+      println(str_join([path, ": ", show(sub(n, failed)), " passed, ", show(failed), " failed"], ""))
+      exit(if gt(failed, 0) then 1 else 0 end)
+  end
 end
 
 fn run_test_loop(names: List[String], fns: List[Fn() -> Unit], i: Int, n: Int, failed: Int) -> Int
   if ge(i, n) then failed else
     let name = prim_slot(names, i)
-    let pid = sys(57, 0, 0, 0)
-    if eq(pid, 0) then
-      let f = prim_slot(fns, i)
-      f()
-      sys(231, 0, 0, 0)
-      0
+    let code = os_test_child(fns, i)
+    if eq(code, 0) then
+      println(str_cat("PASS ", name))
+      run_test_loop(names, fns, add(i, 1), n, failed)
     else
-      let st = zeros(8)
-      sys5(61, pid, prim_addr(st), 0, 0, 0)
-      let sig = mod(prim_byte(st, 0), 128)
-      let code = prim_byte(st, 1)
-      if and(eq(sig, 0), eq(code, 0)) then
-        println(str_cat("PASS ", name))
-        run_test_loop(names, fns, add(i, 1), n, failed)
-      else
-        let why = if ne(sig, 0) then str_join(["  (crashed with signal ", show(sig), ")"], "") else "" end
-        println(str_join(["FAIL ", name, why], ""))
-        run_test_loop(names, fns, add(i, 1), n, add(failed, 1))
-      end
+      let why = if ge(code, 1000) then str_join(["  (crashed with signal ", show(sub(code, 1000)), ")"], "") else "" end
+      println(str_join(["FAIL ", name, why], ""))
+      run_test_loop(names, fns, add(i, 1), n, add(failed, 1))
     end
   end
 end

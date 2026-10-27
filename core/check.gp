@@ -133,16 +133,16 @@ fn use_effect(c: Ck, eff: String, pos: Pos, callee: String) -> Ck
   end
 end
 
-type Target = { arity: Int, name: String, effects: List[String] } end
+type CallTarget = { arity: Int, name: String, effects: List[String] } end
 
-fn call_target(c: Ck, f: Expr, sc: List[String]) -> Target
-  let none_t = Target { arity: -1, name: "", effects: [] }
+fn call_target(c: Ck, f: Expr, sc: List[String]) -> CallTarget
+  let none_t = CallTarget { arity: -1, name: "", effects: [] }
   match f
     case EVar(_, n) ->
       if list_contains(sc, n) then none_t else
         match global(c, c.mod, n)
-          case GFn(fd) -> Target { arity: list_len(fd.params), name: fd.name, effects: fd.effects }
-          case GBuiltin(bi) -> Target { arity: bi.arity, name: n, effects: if eq(bi.effect, "") then [] else [bi.effect] end }
+          case GFn(fd) -> CallTarget { arity: list_len(fd.params), name: fd.name, effects: fd.effects }
+          case GBuiltin(bi) -> CallTarget { arity: bi.arity, name: n, effects: if eq(bi.effect, "") then [] else [bi.effect] end }
           case _ -> none_t
         end
       end
@@ -151,7 +151,7 @@ fn call_target(c: Ck, f: Expr, sc: List[String]) -> Target
         match global(c, c.mod, mn)
           case GMod(m) ->
             match map.get(m.fns, n)
-              case Some(fd) -> Target { arity: list_len(fd.params), name: fd.name, effects: fd.effects }
+              case Some(fd) -> CallTarget { arity: list_len(fd.params), name: fd.name, effects: fd.effects }
               case None -> none_t
             end
           case _ -> none_t
@@ -159,7 +159,7 @@ fn call_target(c: Ck, f: Expr, sc: List[String]) -> Target
       end
     case ECtor(_, n) ->
       match map.get(c.prog.ctors, n)
-        case Some(info) -> Target { arity: info.arity, name: str_cat("constructor ", n), effects: [] }
+        case Some(info) -> CallTarget { arity: info.arity, name: str_cat("constructor ", n), effects: [] }
         case None -> none_t
       end
     case _ -> none_t
