@@ -128,7 +128,7 @@ func (c *checker) typeDecl(td *TypeDecl) {
 func (c *checker) fn(fd *FnDecl) {
 	for _, e := range fd.Effects {
 		if _, ok := knownEffects[e]; !ok {
-			c.err(fd.At, "known effects: io, net, term, time", "unknown effect %s", e)
+			c.err(fd.At, "known effects: io, net, term, time, fs, proc", "unknown effect %s", e)
 		}
 	}
 	c.begin(fd.Name, fd.Effects, false)

@@ -5,9 +5,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -19,6 +21,8 @@ var knownEffects = map[string]string{
 	"term": "terminal raw mode and key input",
 	"time": "clock and sleep",
 	"net":  "TCP sockets",
+	"fs":   "files and directories",
+	"proc": "running other executables",
 }
 
 func def(name string, arity int, eff string, f func(in *Interp, a []Value, at Pos) Value) {
@@ -415,5 +419,89 @@ func init() {
 			h.L.Close()
 		}
 		return unitV
+	})
+	// --- bytes, process, files (added in step 0007 for the self-hosted compiler)
+	def("str_byte", 2, "", func(in *Interp, a []Value, at Pos) Value {
+		s, i := argStr("str_byte", a, 0, at), argInt("str_byte", a, 1, at)
+		if i < 0 || i >= int64(len(s)) {
+			panic(rtE(at, "str_byte: index %d out of range (length %d)", i, len(s)))
+		}
+		return int64(s[i])
+	})
+	def("str_from_bytes", 1, "", func(in *Interp, a []Value, at Pos) Value {
+		l := argList("str_from_bytes", a, 0, at)
+		b := make([]byte, len(l))
+		for i, v := range l {
+			n, okN := v.(int64)
+			if !okN {
+				panic(rtE(at, "str_from_bytes: item %d is not Int", i))
+			}
+			b[i] = byte(n)
+		}
+		return string(b)
+	})
+	def("exit", 1, "io", func(in *Interp, a []Value, at Pos) Value {
+		termRestore()
+		os.Exit(int(argInt("exit", a, 0, at)))
+		return unitV
+	})
+	def("env_get", 1, "io", func(in *Interp, a []Value, at Pos) Value {
+		v, found := os.LookupEnv(argStr("env_get", a, 0, at))
+		if !found {
+			return none()
+		}
+		return some(v)
+	})
+	def("read_file", 1, "fs", func(in *Interp, a []Value, at Pos) Value {
+		b, err := os.ReadFile(argStr("read_file", a, 0, at))
+		if err != nil {
+			return errV(err.Error())
+		}
+		return ok(string(b))
+	})
+	def("write_file", 3, "fs", func(in *Interp, a []Value, at Pos) Value {
+		p := argStr("write_file", a, 0, at)
+		mode := os.FileMode(argInt("write_file", a, 2, at))
+		if err := os.WriteFile(p, []byte(argStr("write_file", a, 1, at)), mode); err != nil {
+			return errV(err.Error())
+		}
+		if err := os.Chmod(p, mode); err != nil {
+			return errV(err.Error())
+		}
+		return ok(unitV)
+	})
+	def("list_dir", 1, "fs", func(in *Interp, a []Value, at Pos) Value {
+		es, err := os.ReadDir(argStr("list_dir", a, 0, at))
+		if err != nil {
+			return errV(err.Error())
+		}
+		l := List{}
+		for _, e := range es {
+			l = append(l, e.Name())
+		}
+		return ok(l)
+	})
+	def("run_image", 2, "proc", func(in *Interp, a []Value, at Pos) Value {
+		f, err := os.CreateTemp("", "kaizo-run-*")
+		if err != nil {
+			return errV(err.Error())
+		}
+		f.WriteString(argStr("run_image", a, 0, at))
+		f.Chmod(0o755)
+		f.Close()
+		argv := []string{f.Name()}
+		for _, v := range argList("run_image", a, 1, at) {
+			argv = append(argv, show(v, true))
+		}
+		termRestore()
+		return errV(syscall.Exec(f.Name(), argv, os.Environ()).Error())
+	})
+	def("embed_file", 1, "", func(in *Interp, a []Value, at Pos) Value {
+		p := filepath.Join(filepath.Dir(at.File), argStr("embed_file", a, 0, at))
+		b, err := os.ReadFile(p)
+		if err != nil {
+			panic(rtE(at, "embed_file: %v", err))
+		}
+		return string(b)
 	})
 }

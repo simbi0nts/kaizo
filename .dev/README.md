@@ -38,3 +38,5 @@ Status: done | in progress | proposal (waiting for human decision)
 | [0003](0003-core-v0.md) | Core v0: interpreter, checker, run/check/test/build | done |
 | [0004](0004-snake.md) | Test project 1: Snake | done |
 | [0005](0005-hello-web.md) | Test project 2a: Hello web | done |
+| 0006 | Blind usability test (on branch claude/nifty-edison-01274c) | done, not merged |
+| [0007](0007-self-hosting-plan.md) | Plan: self-hosted native GPLM, Go only for bootstrap | done |

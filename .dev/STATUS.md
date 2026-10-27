@@ -1,23 +1,12 @@
 # Current status
 
-Current step: 0005 done — both test projects pass (Snake, Hello web 2a)
-Next step:    not chosen yet, see "Proposed next steps"
+Current step: 0007 done — plan for self-hosted native compiler (see 0007)
+Next step:    0008 — compiler front end in GPLM (core/*.gp)
 
-## Quick check
-```
-make test   # 32 GPLM tests: core, libs, apps
-make e2e    # standalone builds + HTTP + pty Snake checks
-```
-
-## Proposed next steps (human picks)
-1. **Blind test** (most valuable for the theory): a fresh agent gets only `core/LANGUAGE.md`
-   and a new app spec, writes it in GPLM; count checker/runtime errors and fix rounds.
-2. Static type checker (generics, Fn types with effects → closes the handler-effect gap).
-3. 2b: mini text browser using `libs/http` (needs an HTTP *client* part + tcp_connect).
-4. Content-hash lockfile for libraries (Theory 1 "shared with other agents").
+Go code now lives in `bootstrap/` (built as build/kaizo-go) and is used only to bootstrap.
 
 ## Toolchain
-Go >= 1.22 (stdlib only), make. `make core` builds build/kaizo. Origin machine had:
+Until step 0010: Go >= 1.22 (stdlib only) for bootstrap/, make. `make core` builds build/kaizo-go. Origin machine had:
 gcc 15.2, go 1.26, python 3.14, node 22; linux/amd64.
 
 ## Layout
