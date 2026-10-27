@@ -86,7 +86,9 @@ Pure:
 - List: `list_len` · `list_get(l, i) -> Option[T]` · `list_cons(x, l)` (prepend) ·
   `list_push(l, x)` (append) · `list_concat(a, b)` · `list_slice(l, from, to)` ·
   `list_reverse` · `list_range(from, to)` (to excluded) · `list_contains(l, x)` ·
-  `list_map(l, f)` · `list_filter(l, f)` · `list_fold(l, init, fn(acc, x) ... end)` · `list_sort` (Int/String)
+  `list_map(l, f)` · `list_filter(l, f)` · `list_fold(l, init, fn(acc, x) ... end)` · `list_sort` (Int/String) ·
+  `list_sort_by(l, before)`: stable merge sort, `before: Fn(T, T) -> Bool` is strict "a goes before b";
+  elements with neither before the other keep input order (e.g. `fn(a, b) gt(a.count, b.count) end`)
 - Prelude (written in GPLM): `is_some(o)` `unwrap_or(o, default)` `is_ok(r)` `max(a, b)` `min(a, b)`
 - Abort: `panic(msg)` · tests: `expect(cond, msg)` · `expect_eq(got, expected)`
 - Compile time: `embed_file("path")` → the file's contents as a String (path relative to the source file)

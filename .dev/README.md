@@ -45,3 +45,4 @@ Status: done | in progress | proposal (waiting for human decision)
 | [0010](0010-remove-go.md) | Go removed; both test projects pass on the native core | done |
 | [0011](0011-cross-platform-plan.md) | Windows x64, macOS x86-64/arm64 targets + CI | implemented, awaiting CI |
 | [0012](0012-hex-literals.md) | Hexadecimal integer literals; compiler constants in hex | done |
+| [0013](0013-list-sort-by.md) | `list_sort_by`: stable sort with a comparator | done |

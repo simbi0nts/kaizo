@@ -550,6 +550,41 @@ fn list_sort(l: List[Int]) -> List[Int]
   end
 end
 
+# stable: an element of b goes first only if before(b[j], a[i]); ties keep input order
+fn merge_by(a: List[Int], b: List[Int], before: Fn(Int, Int) -> Bool, i: Int, j: Int, r: List[Int]) -> List[Int]
+  let na = prim_len(a)
+  let nb = prim_len(b)
+  if and(ge(i, na), ge(j, nb)) then r
+  elif ge(i, na) then
+    prim_set_slot(r, add(i, j), prim_slot(b, j))
+    merge_by(a, b, before, i, add(j, 1), r)
+  elif ge(j, nb) then
+    prim_set_slot(r, add(i, j), prim_slot(a, i))
+    merge_by(a, b, before, add(i, 1), j, r)
+  elif before(prim_slot(b, j), prim_slot(a, i)) then
+    prim_set_slot(r, add(i, j), prim_slot(b, j))
+    merge_by(a, b, before, i, add(j, 1), r)
+  else
+    prim_set_slot(r, add(i, j), prim_slot(a, i))
+    merge_by(a, b, before, add(i, 1), j, r)
+  end
+end
+
+fn sort_by(l: List[Int], before: Fn(Int, Int) -> Bool) -> List[Int]
+  let n = prim_len(l)
+  if le(n, 1) then l else
+    let h = div(n, 2)
+    let a = sort_by(prim_list_view(l, 0, h), before)
+    let b = sort_by(prim_list_view(l, h, sub(n, h)), before)
+    merge_by(a, b, before, 0, 0, prim_list_new(n))
+  end
+end
+
+fn list_sort_by(l: List[Int], before: Fn(Int, Int) -> Bool) -> List[Int]
+  need(l, 2, "list_sort_by", "List")
+  sort_by(l, before)
+end
+
 # ---------- io ----------
 
 fn print(s: String) -> Unit
