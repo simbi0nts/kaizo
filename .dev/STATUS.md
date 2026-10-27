@@ -1,10 +1,10 @@
 # Current status
 
-Current step: 0001 (proposal, waiting for human decisions — see "Open questions" there)
-Next step:    0002 — minimal core: lexer + parser + evaluator, `hello` to stdout
+Current step: 0003 done
+Next step:    0004 — Snake + libs/rand
 
 ## Toolchain
-Not fixed yet (decided in step 0001). Available on the origin machine:
+Go >= 1.22 (stdlib only), make. `make core` builds build/kaizo. Origin machine had:
 gcc 15.2, go 1.26, python 3.14, node 22; linux/amd64.
 
 ## Layout

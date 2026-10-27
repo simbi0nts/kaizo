@@ -33,4 +33,6 @@ Status: done | in progress | proposal (waiting for human decision)
 | Step | Title | Status |
 |------|-------|--------|
 | [0000](0000-bootstrap.md) | Repository bootstrap | done |
-| [0001](0001-concept-proposal.md) | Concept proposal: core, language, test projects | proposal |
+| [0001](0001-concept-proposal.md) | Concept proposal: core, language, test projects | accepted in 0002 |
+| [0002](0002-decisions.md) | Answers to the open questions | done |
+| [0003](0003-core-v0.md) | Core v0: interpreter, checker, run/check/test/build | done |
