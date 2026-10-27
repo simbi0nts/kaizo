@@ -13,6 +13,16 @@ revise an earlier decision, but it says so explicitly instead of editing history
 3. Install the toolchain listed in `STATUS.md` → "Toolchain".
 4. Continue with the next step number.
 
+## Step numbers (rule since step 0018)
+
+Several agents may work in parallel on branches, so numbers are **claimed before work starts**:
+1. On `main`, add a line `NNNN — <title> — <branch or session>` under "Reserved steps" in
+   `STATUS.md` and commit it. Take the next number after the highest one in the index *and* in the
+   reserved list.
+2. Do the work on the branch with that number. When it is merged, move the line to the index.
+3. If a collision still happens, renumber the branch's step at merge time and write the original
+   number in its Status line (as done for 0016 and 0017).
+
 ## Step file template
 
 ```
@@ -52,3 +62,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0015](0015-demo3d.md) | 3D demo scene: software renderer in GPLM | done |
 | [0016](0016-format-experiment.md) | Experiment: GPLM text vs JSON AST vs raw x86 as agent output | done |
 | [0017](0017-list-sort-by.md) | list_sort_by: stable comparator sort | done |
+| [0018](0018-phase0-consolidation.md) | Phase 0: branches merged, step-number rule, CI ready | done (CI waits for a remote) |

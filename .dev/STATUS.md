@@ -1,7 +1,10 @@
 # Current status
 
-Current step: 0015 done — 3D demo scene (software renderer, X11)
-Next step:    run CI on GitHub; then the static type checker
+Current step: 0018 done — Phase 0 consolidation (see ROADMAP.md)
+Next step:    0019 — static type checker (Phase 1); CI as soon as a GitHub remote exists
+
+## Reserved steps
+(none)
 
 ## Quick check
 ```
