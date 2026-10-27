@@ -1,4 +1,4 @@
-# GPLM v0 — language reference (for the agent writing code)
+# GPLM v1 — language reference (for the agent writing code)
 
 Read this whole file before writing GPLM. It is the complete language.
 
@@ -12,7 +12,7 @@ Read this whole file before writing GPLM. It is the complete language.
   of an `if` branch or `match` arm) is a tail call and runs in constant stack.
 - **No exceptions.** Fallible operations return `Result[T, E]` (`Ok`/`Err`) or `Option[T]` (`Some`/`None`).
 - **Effects are declared.** A fn that (directly) calls an effectful builtin or fn must list
-  the effect: `fn main() -> Unit ! [io, time]`. Effects: `io`, `term`, `time`, `net`.
+  the effect: `fn main() -> Unit ! [io, time]`. Effects: `io`, `term`, `time`, `net`, `fs`, `proc`.
   Top-level `let` must be pure. `test` blocks may use any effect.
 - **Exhaustive `match`.** The checker rejects a match that can miss a value.
 - Names: values and functions `lower_snake`; types and constructors `Capitalized`.
@@ -45,9 +45,9 @@ test "area of rect"                      # run with: kaizo test file.gp
   expect_eq(area(Rect(2, 3)), 6)
 end
 ```
-Types: `Int` (64-bit), `String`, `Bool`, `Unit`, `List[T]`, `Option[T]`, `Result[T, E]`,
+Types: `Int` (63-bit signed), `String`, `Bool`, `Unit`, `List[T]`, `Option[T]`, `Result[T, E]`,
 `Fn(A, B) -> C`, `Listener`, `Conn`, single capital letters are type variables.
-v0 checks names, arity, record fields, exhaustiveness and effects; full type checking is planned.
+The checker verifies names, arity, record fields, exhaustiveness and effects; full type checking is planned.
 
 ## Expressions
 ```
@@ -79,16 +79,18 @@ Pure:
   `str_join(list, sep)` · `str_len(s)` (bytes) · `str_slice(s, from, to)` ·
   `str_find(s, sub) -> Option[Int]` · `str_split(s, sep) -> List[String]` · `str_trim` ·
   `str_starts(s, prefix)` · `str_ends(s, suffix)` · `str_repeat(s, n)` · `str_lower` ·
-  `str_to_int(s) -> Option[Int]`
+  `str_to_int(s) -> Option[Int]` · `str_byte(s, i) -> Int` · `str_from_bytes(List[Int]) -> String`
 - List: `list_len` · `list_get(l, i) -> Option[T]` · `list_cons(x, l)` (prepend) ·
   `list_push(l, x)` (append) · `list_concat(a, b)` · `list_slice(l, from, to)` ·
   `list_reverse` · `list_range(from, to)` (to excluded) · `list_contains(l, x)` ·
   `list_map(l, f)` · `list_filter(l, f)` · `list_fold(l, init, fn(acc, x) ... end)` · `list_sort` (Int/String)
 - Prelude (written in GPLM): `is_some(o)` `unwrap_or(o, default)` `is_ok(r)` `max(a, b)` `min(a, b)`
 - Abort: `panic(msg)` · tests: `expect(cond, msg)` · `expect_eq(got, expected)`
+- Compile time: `embed_file("path")` → the file's contents as a String (path relative to the source file)
 
 Effectful:
-- `io`: `print(s)` `println(s)` `read_line() -> Option[String]` `args() -> List[String]`
+- `io`: `print(s)` `println(s)` `read_line() -> Option[String]` `args() -> List[String]` ·
+  `exit(code)` · `env_get(name) -> Option[String]`
 - `term`: `term_raw() -> Result[Unit, String]` (no echo, no line buffering, hidden cursor;
   the core restores the terminal on every exit) · `term_restore()` ·
   `term_key() -> String`: next pending key or `""`; arrows are `"up" "down" "left" "right"`, `"esc"`, else the character
@@ -96,21 +98,27 @@ Effectful:
 - `net`: `tcp_listen("127.0.0.1:8080") -> Result[Listener, String]` ·
   `tcp_accept(l) -> Result[Conn, String]` · `tcp_read(c, max_bytes, timeout_ms) -> Result[String, String]`
   (`""` = closed) · `tcp_write(c, s) -> Result[Unit, String]` · `tcp_close(c)`
+- `fs`: `read_file(path) -> Result[String, String]` · `write_file(path, s, mode) -> Result[Unit, String]`
+  (mode as a decimal number, 493 = 0o755, 420 = 0o644) · `list_dir(path) -> Result[List[String], String]` (sorted)
+- `proc`: `run_image(executable_bytes, args) -> Result[Unit, String]` replaces the process (returns only on error)
 
 ## Libraries
 `import name` loads every `.gp` file of `libs/name/` (searched in `$KAIZO_PATH`, then in
 `libs/` folders from the app upward). Its fns and lets are used qualified: `name.fn(...)`.
 Types and constructors are global (no two modules may define the same name).
 
-## Known gaps of v0 (do not rely on them)
-- No static types yet: a wrong-typed argument fails at run time with file:line:col.
+## Known gaps of v1 (do not rely on them)
+- No static types yet: a wrong-typed argument fails at run time (with file:line:col for
+  operators, field access and calls; errors inside library builtins name the builtin only).
+- No garbage collector yet: memory is only freed when the program exits.
+- Native target: Linux x86-64 only.
 - Effects passed through function values (e.g. a handler argument) are not tracked.
 - A local `let` lambda cannot call itself; write a top-level fn for recursion.
 
 ## Tools
 ```
 kaizo check app.gp [--json]     # diagnostics with file/line/col/message/hint
-kaizo test  app.gp [--json]
-kaizo run   app.gp [args...]
-kaizo build app.gp -o app       # standalone executable
+kaizo test  app.gp              # each test runs in its own process
+kaizo run   app.gp [args...]    # compiles to native code in memory and runs it
+kaizo build app.gp -o app       # static native executable (no libc, no dependencies)
 ```
