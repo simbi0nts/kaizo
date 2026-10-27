@@ -12,7 +12,7 @@ mkdir -p out
 
 "$K" version && ok "kaizo runs ($T)" || bad "kaizo runs"
 
-for s in tests/selftest.gp libs/rand libs/http libs/map libs/sha256 libs/snake libs/x11 apps/snake/main.gp apps/snake-gui/main.gp apps/demo3d/main.gp apps/hello-web/main.gp; do
+for s in tests/selftest.gp libs/rand libs/http libs/map libs/sha256 libs/snake libs/x11 apps/snake/main.gp apps/snake-gui/main.gp apps/demo3d/main.gp apps/hello-web/main.gp apps/todo-cli/main.gp; do
   "$K" test "$s" > out/test.log 2>&1 && ok "suite $s" || { bad "suite $s"; cat out/test.log; }
 done
 

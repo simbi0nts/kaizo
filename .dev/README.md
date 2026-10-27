@@ -40,7 +40,7 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0003](0003-core-v0.md) | Core v0: interpreter, checker, run/check/test/build | done |
 | [0004](0004-snake.md) | Test project 1: Snake | done |
 | [0005](0005-hello-web.md) | Test project 2a: Hello web | done |
-| 0006 | Blind usability test (on branch claude/nifty-edison-01274c) | done, not merged |
+| [0006](0006-blind-test.md) | Blind usability test: todo-cli from LANGUAGE.md only | done (merged in 0018) |
 | [0007](0007-self-hosting-plan.md) | Plan: self-hosted native GPLM, Go only for bootstrap | done |
 | [0008](0008-front-end.md) | Compiler front end in GPLM | done |
 | [0009](0009-native-back-end.md) | Native back end in GPLM; self-hosting fixpoint | done |
