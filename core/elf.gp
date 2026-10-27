@@ -27,10 +27,6 @@ fn strs_from(l: List[String]) -> Strs
   list_fold(list_reverse(l), SNil, fn(acc, s) SCons(s, acc) end)
 end
 
-fn write_pe(o: Out) -> Image
-  Image { bytes: "", missing: ["windows target not implemented yet"] }
-end
-
 fn write_macho(t: Target, o: Out) -> Image
   Image { bytes: "", missing: ["macos target not implemented yet"] }
 end

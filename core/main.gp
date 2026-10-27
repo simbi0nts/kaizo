@@ -52,12 +52,17 @@ fn flag_value(args: List[String], flag: String) -> Option[String]
   end
 end
 
+# Windows users may write apps\\snake\\main.gp; internally paths use /
+fn norm_path(p: String) -> String
+  str_join(str_split(p, str_from_bytes([92])), "/")
+end
+
 fn positional(args: List[String]) -> List[String]
   match args
     case [] -> []
     case ["-o", _, ..rest] -> positional(rest)
     case ["--target", _, ..rest] -> positional(rest)
-    case [a, ..rest] -> if str_starts(a, "--") then positional(rest) else list_cons(a, positional(rest)) end
+    case [a, ..rest] -> if str_starts(a, "--") then positional(rest) else list_cons(norm_path(a), positional(rest)) end
   end
 end
 
@@ -181,7 +186,8 @@ end
 
 fn cmd_run(rest: List[String]) -> Unit ! [io, fs, proc]
   match rest
-    case [path, ..app_args] ->
+    case [raw_path, ..app_args] ->
+      let path = norm_path(raw_path)
       match compile(path, AppMode, host())
         case None -> exit(1)
         case Some(bin) ->
