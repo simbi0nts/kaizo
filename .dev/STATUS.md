@@ -4,7 +4,7 @@ Current step: 0023 done — eval harness; batch 1: tie on correctness (8/8), GPL
 Next step:    harder eval specs (batch 2), then Phase 3 libraries
 
 ## Reserved steps
-(none)
+0024 — eval batch 2: harder specs (this session)
 
 ## Quick check
 ```
