@@ -1,0 +1,5 @@
+# Sources are compiled byte for byte (and embedded into kaizo): keep LF on every OS,
+# so kaizo built on Windows is identical to kaizo built elsewhere.
+* text=auto eol=lf
+seed/kaizo binary
+*.png binary

@@ -310,11 +310,12 @@ end
 
 # rax = object size -> rax = new object (count 1); keeps rcx, rdx, rsi, rdi
 fn alloc_code() -> Code
-  cat([CLab("rt_alloc"), CI([IPush(rcx), IPush(rdx), IAluI(0, rax, 8)]), call_l("rt_class"),
+  # a real frame: rt_alloc calls rt_class, and on arm64 a call overwrites the return address register
+  cat([CLab("rt_alloc"), CI([IEnter, IPush(rcx), IPush(rdx), IAluI(0, rax, 8)]), call_l("rt_class"),
     CI([IAddr(rdx, "freelists"), IShI(4, rcx, 3), IAlu(1, rdx, rcx), ILd(rcx, rdx, 0), IAlu(133, rcx, rcx)]), jcc(cc_e, ".al_bump"),
     CI([IPush(rax), ILd(rax, rcx, 0), ISt(rdx, 0, rax), IPop(rax), IMov(rax, rcx)]), jmp(".al_init"),
     CLab(".al_bump"), CI([IMov(rcx, r14), IAlu(1, r14, rax), IMov(rax, rcx)]),
-    CLab(".al_init"), CI([IMovI(rcx, 1), ISt(rax, 0, rcx), IAluI(0, rax, 8), IPop(rdx), IPop(rcx), IRet])])
+    CLab(".al_init"), CI([IMovI(rcx, 1), ISt(rax, 0, rcx), IAluI(0, rax, 8), IPop(rdx), IPop(rcx), ILeave(0)])])
 end
 
 # drop the value in rax (inside rt_free: may recurse)

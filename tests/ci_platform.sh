@@ -10,7 +10,13 @@ ok()  { echo "PASS $1"; }
 bad() { echo "FAIL $1"; fail=1; }
 mkdir -p out
 
-"$K" version && ok "kaizo runs ($T)" || bad "kaizo runs"
+if "$K" version; then ok "kaizo runs ($T)"; else
+  bad "kaizo runs"
+  # crash report for debugging without the hardware: load address, pc/lr and a backtrace
+  if command -v lldb >/dev/null; then
+    lldb --batch -o run -o "image list -o $K" -o "register read pc lr sp x26 x27 x28 x29" -o bt -- "$K" version 2>&1 | tail -30
+  fi
+fi
 
 for s in tests/selftest.gp libs/rand libs/http libs/map libs/sha256 libs/snake libs/x11 apps/snake/main.gp apps/snake-gui/main.gp apps/demo3d/main.gp apps/hello-web/main.gp apps/todo-cli/main.gp apps/wordfreq/main.gp; do
   "$K" test "$s" > out/test.log 2>&1 && ok "suite $s" || { bad "suite $s"; cat out/test.log; }
