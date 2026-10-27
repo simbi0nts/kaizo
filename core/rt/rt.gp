@@ -762,6 +762,14 @@ fn tcp_accept(l: Int) -> Result[Int, String]
   end
 end
 
+# connection to a Unix domain socket (e.g. the X server); read/write/close it like a TCP connection
+fn unix_connect(path: String) -> Result[Int, String]
+  match os_unix_connect(path)
+    case Ok(fd) -> Ok(prim_handle(fd))
+    case Err(e) -> Err(e)
+  end
+end
+
 fn tcp_read(c: Int, max_bytes: Int, timeout: Int) -> Result[String, String]
   os_tcp_read(prim_id(c), clamp(max_bytes, 1, 1048576), timeout)
 end

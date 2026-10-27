@@ -100,7 +100,8 @@ Effectful:
 - `time`: `now_ms() -> Int` · `sleep_ms(n)`
 - `net`: `tcp_listen("127.0.0.1:8080") -> Result[Listener, String]` ·
   `tcp_accept(l) -> Result[Conn, String]` · `tcp_read(c, max_bytes, timeout_ms) -> Result[String, String]`
-  (`""` = closed) · `tcp_write(c, s) -> Result[Unit, String]` · `tcp_close(c)`
+  (`""` = closed) · `tcp_write(c, s) -> Result[Unit, String]` · `tcp_close(c)` ·
+  `unix_connect(path) -> Result[Conn, String]` (Unix domain socket; use tcp_read/tcp_write/tcp_close on it)
 - `fs`: `read_file(path) -> Result[String, String]` · `write_file(path, s, mode) -> Result[Unit, String]`
   (mode as a decimal number, 493 = 0o755, 420 = 0o644) · `list_dir(path) -> Result[List[String], String]` (sorted)
 - `proc`: `run_image(executable_bytes, args) -> Result[Unit, String]` replaces the process (returns only on error)

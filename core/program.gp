@@ -53,7 +53,7 @@ let builtin_list = [
   b("print", 1, "io"), b("println", 1, "io"), b("read_line", 0, "io"), b("args", 0, "io"), b("exit", 1, "io"), b("env_get", 1, "io"),
   b("term_raw", 0, "term"), b("term_restore", 0, "term"), b("term_key", 0, "term"),
   b("now_ms", 0, "time"), b("sleep_ms", 1, "time"),
-  b("tcp_listen", 1, "net"), b("tcp_accept", 1, "net"), b("tcp_read", 3, "net"), b("tcp_write", 2, "net"), b("tcp_close", 1, "net"),
+  b("tcp_listen", 1, "net"), b("tcp_accept", 1, "net"), b("tcp_read", 3, "net"), b("tcp_write", 2, "net"), b("tcp_close", 1, "net"), b("unix_connect", 1, "net"),
   b("read_file", 1, "fs"), b("write_file", 3, "fs"), b("list_dir", 1, "fs"),
   b("run_image", 2, "proc")
 ]

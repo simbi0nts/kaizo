@@ -121,6 +121,20 @@ fn os_tcp_listen(addr: String) -> Result[Int, String]
   end
 end
 
+fn os_unix_connect(path: String) -> Result[Int, String]
+  let fd = sys(41, 1, 524289, 0)
+  if lt(fd, 0) then Err(os_errmsg(fd)) else
+    let sa = zeros(110)
+    put_le(sa, 0, 1, 2)
+    prim_copy(sa, 2, path, 0, min(prim_len(path), 107))
+    let r = sys(42, fd, prim_addr(sa), 110)
+    if lt(r, 0) then
+      sys(3, fd, 0, 0)
+      Err(str_join(["connect ", path, ": ", os_errmsg(r)], ""))
+    else Ok(fd) end
+  end
+end
+
 fn os_tcp_accept(l: Int) -> Result[Int, String]
   let fd = sys(43, l, 0, 0)
   if lt(fd, 0) then Err(os_errmsg(fd)) else Ok(fd) end

@@ -46,3 +46,4 @@ Status: done | in progress | proposal (waiting for human decision)
 | [0011](0011-cross-platform-plan.md) | Windows x64, macOS x86-64/arm64 targets + CI | implemented, awaiting CI |
 | [0012](0012-hex-literals.md) | Hexadecimal integer literals; compiler constants in hex | done |
 | [0013](0013-reference-counting.md) | Compiler-inferred reference counting | done |
+| [0014](0014-snake-gui.md) | Snake with a GUI (X11 protocol in GPLM) | done |

@@ -108,6 +108,21 @@ fn os_tcp_listen(addr: String) -> Result[Int, String]
   end
 end
 
+fn os_unix_connect(path: String) -> Result[Int, String]
+  let fd = neg_errno(prim_ccall32("socket", [1, 1, 0]))
+  if lt(fd, 0) then Err(os_errmsg(fd)) else
+    let sa = zeros(106)
+    prim_set_byte(sa, 0, 106)
+    prim_set_byte(sa, 1, 1)
+    prim_copy(sa, 2, path, 0, min(prim_len(path), 103))
+    let r = neg_errno(prim_ccall32("connect", [fd, prim_addr(sa), 106]))
+    if lt(r, 0) then
+      prim_ccall32("close", [fd])
+      Err(str_join(["connect ", path, ": ", os_errmsg(r)], ""))
+    else Ok(fd) end
+  end
+end
+
 fn os_tcp_accept(l: Int) -> Result[Int, String]
   let fd = neg_errno(prim_ccall32("accept", [l, 0, 0]))
   if lt(fd, 0) then Err(os_errmsg(fd)) else Ok(fd) end

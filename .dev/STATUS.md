@@ -1,6 +1,6 @@
 # Current status
 
-Current step: 0013 done — reference counting: memory is freed (servers flat, self-compile 67 MB)
+Current step: 0014 done — GUI Snake on X11 (libs/x11, libs/snake)
 Next step:    run CI on GitHub; then the static type checker
 
 ## Quick check

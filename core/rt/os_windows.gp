@@ -188,6 +188,10 @@ fn os_tcp_listen(addr: String) -> Result[Int, String]
   end
 end
 
+fn os_unix_connect(path: String) -> Result[Int, String]
+  Err("unix sockets are not supported on Windows")
+end
+
 fn os_tcp_accept(l: Int) -> Result[Int, String]
   let c = prim_ccall("ws2_32.dll!accept", [l, 0, 0])
   if eq(c, -1) then Err(os_errmsg(wsa_error())) else Ok(c) end
