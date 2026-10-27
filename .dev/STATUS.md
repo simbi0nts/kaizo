@@ -4,7 +4,7 @@ Current step: 0022 done — Phase 1 complete (static types + effect types; exit 
 Next step:    0023 — `kaizo eval` harness (Phase 2)
 
 ## Reserved steps
-(none)
+0023 — eval harness: specs, hidden tests, scoring, agent protocol (this session)
 
 ## Quick check
 ```
