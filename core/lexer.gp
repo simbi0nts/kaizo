@@ -47,6 +47,23 @@ fn scan_while_digit(s: String, j: Int) -> Int
   if is_digit(byte_at(s, j)) then scan_while_digit(s, add(j, 1)) else j end
 end
 
+fn hex_val(c: Int) -> Int
+  if is_digit(c) then sub(c, 48) elif and(ge(c, 97), le(c, 102)) then sub(c, 87) elif and(ge(c, 65), le(c, 70)) then sub(c, 55) else -1 end
+end
+
+fn scan_while_hex(s: String, j: Int) -> Int
+  if ge(hex_val(byte_at(s, j)), 0) then scan_while_hex(s, add(j, 1)) else j end
+end
+
+fn parse_hex(s: String, j: Int, stop: Int, acc: Int) -> Int
+  if ge(j, stop) then acc else parse_hex(s, add(j, 1), stop, add(mul(acc, 16), hex_val(str_byte(s, j)))) end
+end
+
+# true when the digits starting at d are a hex prefix 0x / 0X
+fn is_hex_prefix(s: String, d: Int) -> Bool
+  and(eq(byte_at(s, d), 48), or(eq(byte_at(s, add(d, 1)), 120), eq(byte_at(s, add(d, 1)), 88)))
+end
+
 fn skip_comment(s: String, j: Int) -> Int
   let c = byte_at(s, j)
   if or(eq(c, -1), eq(c, 10)) then j else skip_comment(s, add(j, 1)) end
@@ -115,11 +132,23 @@ fn lex_loop(x: Lx) -> Lexed
     let kind = if eq(text, "_") then TkPunct elif list_contains(keywords, text) then TkKw elif and(ge(c, 65), le(c, 90)) then TkUpper else TkIdent end
     lex_loop(lx_push(x, kind, text, 0, pos, sub(j, x.i)))
   elif or(is_digit(c), and(eq(c, 45), is_digit(byte_at(s, add(x.i, 1))))) then
-    let j = scan_while_digit(s, add(x.i, 1))
     let neg = eq(c, 45)
-    let mag = parse_digits(s, if neg then add(x.i, 1) else x.i end, j, 0)
-    let n = if neg then sub(0, mag) else mag end
-    lex_loop(lx_push(x, TkInt, str_slice(s, x.i, j), n, pos, sub(j, x.i)))
+    let d = if neg then add(x.i, 1) else x.i end
+    if is_hex_prefix(s, d) then
+      let j = scan_while_hex(s, add(d, 2))
+      if eq(j, add(d, 2)) then
+        lex_err(x, pos, str_cat("hex literal has no digits: ", str_slice(s, x.i, j)), "write hex digits after 0x, e.g. 0x1F or -0xff")
+      else
+        let mag = parse_hex(s, add(d, 2), j, 0)
+        let n = if neg then sub(0, mag) else mag end
+        lex_loop(lx_push(x, TkInt, str_slice(s, x.i, j), n, pos, sub(j, x.i)))
+      end
+    else
+      let j = scan_while_digit(s, add(x.i, 1))
+      let mag = parse_digits(s, d, j, 0)
+      let n = if neg then sub(0, mag) else mag end
+      lex_loop(lx_push(x, TkInt, str_slice(s, x.i, j), n, pos, sub(j, x.i)))
+    end
   elif eq(c, 34) then
     let r = scan_string(s, add(x.i, 1), add(x.i, 1), [])
     if r.ok then
@@ -150,4 +179,30 @@ end
 
 fn lex(file: String, src: String) -> Lexed
   lex_loop(Lx { src: src, file: file, i: 0, line: 1, col: 1, acc: TNil })
+end
+
+fn lex_first_num(src: String) -> Option[Int]
+  let r = lex("t.gp", src)
+  match r.toks
+    case TCons(t, _) -> if eq(t.kind, TkInt) then Some(t.num) else None end
+    case TNil -> None
+  end
+end
+
+fn lex_err_msg(src: String) -> String
+  match lex("t.gp", src).err
+    case Some(d) -> str_cat(str_cat(d.msg, " | "), d.hint)
+    case None -> ""
+  end
+end
+
+test "lexer: hex literals"
+  expect_eq(lex_first_num("0x1F"), Some(31))
+  expect_eq(lex_first_num("0x1f"), Some(31))
+  expect_eq(lex_first_num("0XfAdE0cC0"), Some(4208856256))
+  expect_eq(lex_first_num("-0x10"), Some(-16))
+  expect_eq(lex_first_num("0"), Some(0))
+  expect_eq(lex_first_num("-12"), Some(-12))
+  expect_eq(lex_err_msg("0x"), "hex literal has no digits: 0x | write hex digits after 0x, e.g. 0x1F or -0xff")
+  expect_eq(lex_err_msg("-0xg"), "hex literal has no digits: -0x | write hex digits after 0x, e.g. 0x1F or -0xff")
 end

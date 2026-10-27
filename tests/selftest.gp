@@ -88,3 +88,12 @@ test "bit operations"
   expect_eq(list_map([1, 2], fn(x) bit_shl(x, 3) end), [8, 16])
   expect(ne(target(), ""), "target is known")
 end
+
+test "hex literals"
+  expect_eq(0x1F, 31)
+  expect_eq(0x1f, 0X1F)
+  expect_eq(0xFADE0CC0, 4208856256)
+  expect_eq(-0x1F, -31)
+  expect_eq(-0xff, sub(0, 255))
+  expect_eq(bit_and(0xFFFFFFFF, -1), 4294967295)
+end
