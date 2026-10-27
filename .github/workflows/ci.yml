@@ -63,6 +63,6 @@ jobs:
           # the job summary is readable without signing in (step logs are not)
           { echo "### ${{ matrix.target }}: exit $status"; echo '```'; tail -c 60000 out/ci.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           # annotations are public even when logs are not: publish the end of the output
-          msg=$(tail -c 8000 out/ci.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\r/%0D/g;s/\n/%0A/g')
+          msg=$(tail -c 8000 out/ci.log | awk 'BEGIN{ORS="%0A"}{gsub(/%/,"%25"); gsub(/\r/,"%0D"); print}')
           if [ "$status" = 0 ]; then echo "::notice title=${{ matrix.target }} checks::$msg"; else echo "::error title=${{ matrix.target }} checks::$msg"; fi
           exit $status
