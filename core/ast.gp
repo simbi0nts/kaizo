@@ -21,7 +21,8 @@ type Pat =
   | PCtor(Pos, String, List[Pat]) | PList(Pos, List[Pat], Option[Pat])
 end
 
-type TypeX = { name: String, args: List[TypeX] } end
+# effects: only for Fn types (Fn(A) -> B ! [io])
+type TypeX = { name: String, args: List[TypeX], effects: List[String] } end
 type Param = { name: String, ty: Option[TypeX] } end
 type FnDecl = { pos: Pos, name: String, params: List[Param], ret: TypeX, effects: List[String], body: List[Stmt] } end
 type CtorDecl = { pos: Pos, name: String, args: List[TypeX] } end

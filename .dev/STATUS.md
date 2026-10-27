@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0020 done — static types (inference) for all code except the runtime
-Next step:    0021 — effects in function types
+Current step: 0021 done — static types incl. effects of function values
+Next step:    0022 — use the types (RC skips Int), docs
 
 ## Reserved steps
-0021 — function types carry effects (this session)
 0022 — use the types: RC skips Int values, docs (this session)
 
 ## Quick check

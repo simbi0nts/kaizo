@@ -85,7 +85,8 @@ fn is_type_var(name: String) -> Bool
 end
 
 fn check_typex(c: Ck, t: TypeX, pos: Pos, tparams: List[String]) -> Ck
-  let c1 = if or(map.has(c.prog.types, t.name), or(list_contains(tparams, t.name), is_type_var(t.name))) then c else ck_err(c, pos, str_cat("unknown type ", t.name), "") end
+  let c0 = list_fold(t.effects, c, fn(acc, e) if list_contains(effect_names, e) then acc else ck_err(acc, pos, str_cat("unknown effect ", e), "known effects: io, net, term, time, fs, proc") end end)
+  let c1 = if or(map.has(c.prog.types, t.name), or(list_contains(tparams, t.name), is_type_var(t.name))) then c0 else ck_err(c0, pos, str_cat("unknown type ", t.name), "") end
   list_fold(t.args, c1, fn(acc, a) check_typex(acc, a, pos, tparams) end)
 end
 

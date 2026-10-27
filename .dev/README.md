@@ -65,3 +65,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0018](0018-phase0-consolidation.md) | Phase 0: branches merged, step-number rule, CI ready | done |
 | [0019](0019-ci-real-hardware.md) | CI on real Windows/macOS: 2 bugs fixed, all 4 targets green | done |
 | [0020](0020-type-checker.md) | Static type checker: inference, generics, records | done |
+| [0021](0021-effect-types.md) | Function types carry effects | done |

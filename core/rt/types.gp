@@ -1,4 +1,5 @@
-# Types of the builtins, for the type checker (bodies are never used). Single capital letters
+# Types and effects of the builtins, for the type checker (bodies are never used).
+# Function arguments of builtins are effect-transparent: list_map(l, f) has the effects of f. Single capital letters
 # are type variables. Keep in sync with builtin_list in program.gp and with rt.gp.
 
 fn add(a: Int, b: Int) -> Int Unit end
@@ -54,24 +55,24 @@ fn panic(msg: A) -> B Unit end
 fn expect(c: Bool, msg: A) -> Unit Unit end
 fn expect_eq(got: A, want: A) -> Unit Unit end
 fn embed_file(path: String) -> String Unit end
-fn print(s: String) -> Unit Unit end
-fn println(s: String) -> Unit Unit end
-fn read_line() -> Option[String] Unit end
-fn args() -> List[String] Unit end
-fn exit(code: Int) -> Unit Unit end
-fn env_get(name: String) -> Option[String] Unit end
-fn term_raw() -> Result[Unit, String] Unit end
-fn term_restore() -> Unit Unit end
-fn term_key() -> String Unit end
-fn now_ms() -> Int Unit end
-fn sleep_ms(n: Int) -> Unit Unit end
-fn tcp_listen(addr: String) -> Result[Listener, String] Unit end
-fn tcp_accept(l: Listener) -> Result[Conn, String] Unit end
-fn tcp_read(c: Conn, max: Int, timeout: Int) -> Result[String, String] Unit end
-fn tcp_write(c: Conn, s: String) -> Result[Unit, String] Unit end
-fn tcp_close(c: A) -> Unit Unit end
-fn unix_connect(path: String) -> Result[Conn, String] Unit end
-fn read_file(path: String) -> Result[String, String] Unit end
-fn write_file(path: String, s: String, mode: Int) -> Result[Unit, String] Unit end
-fn list_dir(path: String) -> Result[List[String], String] Unit end
-fn run_image(bin: String, args: List[String]) -> Result[Unit, String] Unit end
+fn print(s: String) -> Unit ! [io] Unit end
+fn println(s: String) -> Unit ! [io] Unit end
+fn read_line() -> Option[String] ! [io] Unit end
+fn args() -> List[String] ! [io] Unit end
+fn exit(code: Int) -> Unit ! [io] Unit end
+fn env_get(name: String) -> Option[String] ! [io] Unit end
+fn term_raw() -> Result[Unit, String] ! [term] Unit end
+fn term_restore() -> Unit ! [term] Unit end
+fn term_key() -> String ! [term] Unit end
+fn now_ms() -> Int ! [time] Unit end
+fn sleep_ms(n: Int) -> Unit ! [time] Unit end
+fn tcp_listen(addr: String) -> Result[Listener, String] ! [net] Unit end
+fn tcp_accept(l: Listener) -> Result[Conn, String] ! [net] Unit end
+fn tcp_read(c: Conn, max: Int, timeout: Int) -> Result[String, String] ! [net] Unit end
+fn tcp_write(c: Conn, s: String) -> Result[Unit, String] ! [net] Unit end
+fn tcp_close(c: A) -> Unit ! [net] Unit end
+fn unix_connect(path: String) -> Result[Conn, String] ! [net] Unit end
+fn read_file(path: String) -> Result[String, String] ! [fs] Unit end
+fn write_file(path: String, s: String, mode: Int) -> Result[Unit, String] ! [fs] Unit end
+fn list_dir(path: String) -> Result[List[String], String] ! [fs] Unit end
+fn run_image(bin: String, args: List[String]) -> Result[Unit, String] ! [proc] Unit end

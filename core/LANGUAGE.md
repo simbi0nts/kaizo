@@ -14,6 +14,10 @@ Read this whole file before writing GPLM. It is the complete language.
 - **Effects are declared.** A fn that (directly) calls an effectful builtin or fn must list
   the effect: `fn main() -> Unit ! [io, time]`. Effects: `io`, `term`, `time`, `net`, `fs`, `proc`.
   Top-level `let` must be pure. `test` blocks may use any effect.
+  Function types carry effects too: `Fn(Request) -> Response` is pure, `Fn(Int) -> Unit ! [io]` may
+  print. A function value fits a parameter only if its effects are allowed there, and calling a
+  function value uses its effects. Builtins that take functions (`list_map`, `list_fold`, ...) pass
+  the effects of the function you give them on to the caller.
 - **Exhaustive `match`.** The checker rejects a match that can miss a value.
 - Names: values and functions `lower_snake`; types and constructors `Capitalized`.
 - Comments: `#` to end of line. Strings are one line; escapes `\n \t \r \0 \e \\ \"`
@@ -53,7 +57,7 @@ types from the function they are passed to). In a signature, a single capital le
 type variable — unless a type with that name is declared. Inside the function body a type variable
 is fixed (you cannot return an `Int` where `T` is expected); at each call it becomes whatever the
 arguments are. Generic types: `type Box[T] = { v: T } end`, `Option[T]`, `Result[T, E]`, `List[T]`,
-function types `Fn(A, B) -> C`. Errors name the expected and the actual type at the exact position.
+function types `Fn(A, B) -> C` (with effects: `Fn(A) -> B ! [io]`). Errors name the expected and the actual type at the exact position.
 
 ## Expressions
 ```
@@ -125,7 +129,6 @@ Types and constructors are global (no two modules may define the same name).
   expression is, it asks for an annotation (give the function parameter or result a type).
 - Memory is managed automatically (reference counting inferred by the compiler, step 0013); nothing to write.
 - Targets: Linux x86-64, Windows x64, macOS x86-64 and arm64.
-- Effects passed through function values (e.g. a handler argument) are not tracked.
 - A local `let` lambda cannot call itself; write a top-level fn for recursion.
 
 ## Tools

@@ -3,11 +3,13 @@
 # declarations. Single capital letters in a signature are type variables: rigid inside the body,
 # instantiated fresh at every use. Types flow into lambdas from the call they are passed to.
 
-type Ty = TV(Int) | TC(String, List[Ty]) | TF(List[Ty], Ty) end
+# TF(params, result, effects): calling it uses those effects
+type Ty = TV(Int) | TC(String, List[Ty]) | TF(List[Ty], Ty, List[String]) end
+type EffUse = { eff: String, pos: Pos } end
 type Scheme = { vars: List[String], ty: Ty } end
 type TBind = { name: String, ty: Ty } end
 type Pend = { var: Ty, field: String, res: Ty, pos: Pos } end
-type TS = { sub: Map[Ty], next: Int, diags: List[Diag], pend: List[Pend], prog: Program, mod: Module, sigs: Map[FnDecl], lets: Map[Ty] } end
+type TS = { sub: Map[Ty], next: Int, diags: List[Diag], pend: List[Pend], prog: Program, mod: Module, sigs: Map[FnDecl], lets: Map[Ty], used: List[EffUse], lenient: Bool } end
 type TR = { ts: TS, ty: Ty } end
 type TE = { ts: TS, env: List[TBind] } end
 
@@ -63,7 +65,7 @@ end
 fn zonk(ts: TS, t: Ty) -> Ty
   match tresolve(ts, t)
     case TC(n, args) -> TC(n, list_map(args, fn(a) zonk(ts, a) end))
-    case TF(ps, r) -> TF(list_map(ps, fn(p) zonk(ts, p) end), zonk(ts, r))
+    case TF(ps, r, es) -> TF(list_map(ps, fn(p) zonk(ts, p) end), zonk(ts, r), es)
     case v -> v
   end
 end
@@ -73,7 +75,9 @@ fn ty_str(t: Ty) -> String
     case TV(_) -> "?"
     case TC(n, []) -> if str_starts(n, "'") then str_slice(n, 1, str_len(n)) else n end
     case TC(n, args) -> str_join([n, "[", str_join(list_map(args, ty_str), ", "), "]"], "")
-    case TF(ps, r) -> str_join(["Fn(", str_join(list_map(ps, ty_str), ", "), ") -> ", ty_str(r)], "")
+    case TF(ps, r, es) ->
+      let base = str_join(["Fn(", str_join(list_map(ps, ty_str), ", "), ") -> ", ty_str(r)], "")
+      if eq(list_len(es), 0) then base else str_join([base, " ! [", str_join(es, ", "), "]"], "") end
   end
 end
 
@@ -81,7 +85,7 @@ fn occurs(ts: TS, n: Int, t: Ty) -> Bool
   match tresolve(ts, t)
     case TV(m) -> eq(m, n)
     case TC(_, args) -> list_fold(args, false, fn(acc, a) or(acc, occurs(ts, n, a)) end)
-    case TF(ps, r) -> or(occurs(ts, n, r), list_fold(ps, false, fn(acc, a) or(acc, occurs(ts, n, a)) end))
+    case TF(ps, r, _) -> or(occurs(ts, n, r), list_fold(ps, false, fn(acc, a) or(acc, occurs(ts, n, a)) end))
   end
 end
 
@@ -106,11 +110,13 @@ fn unify_raw(ts: TS, a: Ty, b: Ty) -> UR
         case TC(nb, ab) -> if and(eq(na, nb), eq(list_len(aa), list_len(ab))) then unify_all(ts, aa, ab) else UR { ts: ts, ok: false } end
         case _ -> UR { ts: ts, ok: false }
       end
-    case TF(pa, ra2) ->
+    case TF(pa, ra2, ea) ->
       match rb
         case TV(m) -> bind_var(ts, m, ra)
-        case TF(pb, rb2) ->
-          if ne(list_len(pa), list_len(pb)) then UR { ts: ts, ok: false } else
+        case TF(pb, rb2, eb) ->
+          # a function with effects ea fits where effects eb are allowed only if ea is a subset of eb
+          let fits = or(ts.lenient, list_fold(ea, true, fn(acc, e) and(acc, list_contains(eb, e)) end))
+          if or(ne(list_len(pa), list_len(pb)), not(fits)) then UR { ts: ts, ok: false } else
             let r = unify_all(ts, pa, pb)
             if r.ok then unify_raw(r.ts, ra2, rb2) else r end
           end
@@ -146,7 +152,7 @@ fn tx_ty(t: TypeX, vars: Map[Ty]) -> Ty
     case None ->
       if eq(t.name, "Fn") then
         let all = list_map(t.args, fn(a) tx_ty(a, vars) end)
-        TF(list_slice(all, 0, sub(list_len(all), 1)), unwrap_or(list_get(all, sub(list_len(all), 1)), TC("Unit", [])))
+        TF(list_slice(all, 0, sub(list_len(all), 1)), unwrap_or(list_get(all, sub(list_len(all), 1)), TC("Unit", [])), t.effects)
       else TC(t.name, list_map(t.args, fn(a) tx_ty(a, vars) end)) end
   end
 end
@@ -184,7 +190,7 @@ fn instantiate_fn(ts: TS, fd: FnDecl) -> TR
   let fr = fresh_n(ts, list_len(names))
   let vars = list_fold(list_range(0, list_len(names)), map.empty(), fn(m, i) map.set(m, unwrap_or(list_get(names, i), ""), unwrap_or(list_get(fr.tys, i), t_int())) end)
   let s = sig_with(fd, vars)
-  TR { ts: fr.ts, ty: TF(s.params, s.ret) }
+  TR { ts: fr.ts, ty: TF(s.params, s.ret, fd.effects) }
 end
 
 fn type_vars_map(ts: TS, names: List[String]) -> TM
@@ -206,7 +212,7 @@ fn instantiate_ctor(ts: TS, name: String) -> TR
           let result = TC(td.name, tm.tys)
           let cd = list_filter(td.ctors, fn(c) eq(c.name, name) end)
           match cd
-            case [c, .._] -> if eq(list_len(c.args), 0) then TR { ts: tm.ts, ty: result } else TR { ts: tm.ts, ty: TF(list_map(c.args, fn(a) tx_ty(a, tm.vars) end), result) } end
+            case [c, .._] -> if eq(list_len(c.args), 0) then TR { ts: tm.ts, ty: result } else TR { ts: tm.ts, ty: TF(list_map(c.args, fn(a) tx_ty(a, tm.vars) end), result, []) } end
             case [] -> TR { ts: tm.ts, ty: result }
           end
       end
@@ -356,10 +362,16 @@ fn check(ts: TS, env: List[TBind], e: Expr, want: Ty) -> TS
   match e
     case ELam(pos, params, body) ->
       match tresolve(ts, want)
-        case TF(ps, r) ->
+        case TF(ps, r, weffs) ->
           if eq(list_len(ps), list_len(params)) then
             let env2 = list_fold(list_range(0, list_len(params)), env, fn(acc, i) list_cons(TBind { name: unwrap_or(list_get(params, i), ""), ty: unwrap_or(list_get(ps, i), t_int()) }, acc) end)
-            infer_block(ts, env2, body, r)
+            let lam = lambda_body(ts, env2, body, r)
+            let missing = list_filter(lam.effs, fn(e) not(list_contains(weffs, e)) end)
+            if or(ts.lenient, eq(list_len(missing), 0)) then lam.ts else
+              ty_err(lam.ts, pos, str_join(["this function uses ", str_join(missing, ", "), ", but the function type it is passed as allows ",
+                if eq(list_len(weffs), 0) then "no effects" else str_join(weffs, ", ") end], ""),
+                "declare the effect in the parameter's type, e.g. Fn(A) -> B ! [io], or keep effects out of the callback")
+            end
           else
             let got = infer(ts, env, e)
             unify(got.ts, got.ty, want, pos, "")
@@ -402,18 +414,30 @@ fn infer(ts: TS, env: List[TBind], e: Expr) -> TR
     case ECall(pos, f, args) ->
       let fr = infer(ts, env, f)
       let fty = tresolve(fr.ts, fr.ty)
+      let builtin = is_builtin_call(fr.ts, env, f)
       match fty
-        case TF(ps, ret) ->
-          if ne(list_len(ps), list_len(args)) then TR { ts: fr.ts, ty: ret } else
-            let ts2 = list_fold(list_range(0, list_len(args)), fr.ts, fn(acc, i)
-              check_arg(acc, env, unwrap_or(list_get(args, i), EInt(pos, 0)), unwrap_or(list_get(ps, i), t_int()), i)
+        case TF(ps, ret, effs) ->
+          let ts1 = use_effects(fr.ts, effs, pos)
+          if ne(list_len(ps), list_len(args)) then TR { ts: ts1, ty: ret } else
+            let ts2 = list_fold(list_range(0, list_len(args)), ts1, fn(acc, i)
+              let arg = unwrap_or(list_get(args, i), EInt(pos, 0))
+              let want = unwrap_or(list_get(ps, i), t_int())
+              if builtin then
+                let a1 = check({ acc with lenient: true }, env, arg, want)
+                let a2 = { a1 with lenient: acc.lenient }
+                # a builtin calls its function arguments: their effects are used here
+                match tresolve(a2, want)
+                  case TF(_, _, _) -> arg_effects(a2, env, arg, pos)
+                  case _ -> a2
+                end
+              else check_arg(acc, env, arg, want, i) end
             end)
             TR { ts: ts2, ty: ret }
           end
         case _ ->
           let rs = fresh(fr.ts)
           let ps = fresh_n(rs.ts, list_len(args))
-          let ts2 = unify(ps.ts, fty, TF(ps.tys, rs.ty), pos, " (called value is not a function of this shape)")
+          let ts2 = unify(ps.ts, fty, TF(ps.tys, rs.ty, []), pos, " (called value is not a function of this shape)")
           TR { ts: list_fold(list_range(0, list_len(args)), ts2, fn(acc, i) check(acc, env, unwrap_or(list_get(args, i), EInt(pos, 0)), unwrap_or(list_get(ps.tys, i), t_int())) end), ty: rs.ty }
       end
     case EField(pos, x, n) ->
@@ -454,7 +478,42 @@ fn infer(ts: TS, env: List[TBind], e: Expr) -> TR
       let ps = fresh_n(ts, list_len(params))
       let res = fresh(ps.ts)
       let env2 = list_fold(list_range(0, list_len(params)), env, fn(acc, i) list_cons(TBind { name: unwrap_or(list_get(params, i), ""), ty: unwrap_or(list_get(ps.tys, i), t_int()) }, acc) end)
-      TR { ts: infer_block(res.ts, env2, body, res.ty), ty: TF(ps.tys, res.ty) }
+      let lam = lambda_body(res.ts, env2, body, res.ty)
+      TR { ts: lam.ts, ty: TF(ps.tys, res.ty, lam.effs) }
+  end
+end
+
+fn use_effects(ts: TS, effs: List[String], pos: Pos) -> TS
+  list_fold(effs, ts, fn(acc, e) if list_contains(list_map(acc.used, fn(u) u.eff end), e) then acc else { acc with used: list_push(acc.used, EffUse { eff: e, pos: pos }) } end end)
+end
+
+type LamR = { ts: TS, effs: List[String] } end
+
+# a lambda body is checked with its own effect set (the enclosing function's set is restored)
+fn lambda_body(ts: TS, env: List[TBind], body: List[Stmt], r: Ty) -> LamR
+  let inner = infer_block({ ts with used: [], lenient: false }, env, body, r)
+  LamR { ts: { inner with used: ts.used, lenient: ts.lenient }, effs: list_map(inner.used, fn(u) u.eff end) }
+end
+
+# the effects of a function value passed to a builtin
+fn arg_effects(ts: TS, env: List[TBind], arg: Expr, pos: Pos) -> TS
+  let r = infer({ ts with diags: [] }, env, arg)
+  match tresolve(r.ts, r.ty)
+    case TF(_, _, effs) -> use_effects(ts, effs, pos)
+    case _ -> ts
+  end
+end
+
+fn is_builtin_call(ts: TS, env: List[TBind], f: Expr) -> Bool
+  match f
+    case EVar(_, n) ->
+      if is_some(lookup_tenv(env, n)) then false
+      elif or(map.has(ts.mod.fns, n), map.has(ts.mod.lets, n)) then false
+      else
+        let pm = get_module(ts.prog, prelude_module)
+        and(not(or(map.has(pm.fns, n), map.has(pm.lets, n))), map.has(ts.sigs, n))
+      end
+    case _ -> false
   end
 end
 
@@ -485,7 +544,7 @@ fn bind_pat(ts: TS, env: List[TBind], p: Pat, t: Ty) -> TE
     case PCtor(pos, n, args) ->
       let c = instantiate_ctor(ts, n)
       match c.ty
-        case TF(ps, res) ->
+        case TF(ps, res, _) ->
           let ts1 = unify(c.ts, res, t, pos, str_cat(" in pattern ", n))
           list_fold(list_range(0, list_len(args)), TE { ts: ts1, env: env }, fn(acc, i)
             bind_pat(acc.ts, acc.env, unwrap_or(list_get(args, i), PWild(pos)), unwrap_or(list_get(ps, i), t_int()))
@@ -515,7 +574,17 @@ fn check_fn_types(ts: TS, fd: FnDecl) -> TS
       case None -> acc
     end
   end)
-  finish_pending(infer_block({ ts with pend: [] }, env, fd.body, s.ret))
+  let done = finish_pending(infer_block({ ts with pend: [], used: [] }, env, fd.body, s.ret))
+  undeclared(done, fd.name, fd.effects)
+end
+
+fn undeclared(ts: TS, fname: String, declared: List[String]) -> TS
+  list_fold(ts.used, { ts with used: [] }, fn(acc, u)
+    if list_contains(declared, u.eff) then acc else
+      ty_err(acc, u.pos, str_join([fname, " uses ", u.eff, " (through a function value), but ", fname, " does not declare it"], ""),
+        str_join(["add ", u.eff, " to the effect list of ", fname, ": ! [", u.eff, "]"], ""))
+    end
+  end)
 end
 
 fn builtin_sigs() -> Map[FnDecl]
@@ -527,14 +596,14 @@ end
 
 # type-checks every module except the runtime (which works below the type system)
 fn typecheck_program(p: Program) -> List[Diag]
-  let ts0 = TS { sub: map.empty(), next: 0, diags: [], pend: [], prog: p, mod: get_module(p, prelude_module), sigs: builtin_sigs(), lets: map.empty() }
+  let ts0 = TS { sub: map.empty(), next: 0, diags: [], pend: [], prog: p, mod: get_module(p, prelude_module), sigs: builtin_sigs(), lets: map.empty(), used: [], lenient: false }
   let ts = list_fold(list_filter(p.order, fn(n) ne(n, rt_module) end), ts0, fn(acc, name)
     let m = get_module(p, name)
     let a0 = { acc with mod: m }
     let a1 = list_fold(m.files, a0, fn(a, f)
       list_fold(f.lets, a, fn(a2, ld)
-        let r = infer({ a2 with pend: [] }, [], ld.x)
-        let a3 = finish_pending(r.ts)
+        let r = infer({ a2 with pend: [], used: [] }, [], ld.x)
+        let a3 = undeclared(finish_pending(r.ts), str_cat("let ", ld.name), [])
         { a3 with lets: map.set(a3.lets, str_join([m.name, ".", ld.name], ""), zonk(a3, r.ty)) }
       end)
     end)
@@ -542,7 +611,8 @@ fn typecheck_program(p: Program) -> List[Diag]
       let a2 = list_fold(f.fns, a, check_fn_types)
       list_fold(f.tests, a2, fn(a3, t)
         let res = fresh(a3)
-        finish_pending(infer_block({ res.ts with pend: [] }, [], t.body, res.ty))
+        let done = finish_pending(infer_block({ res.ts with pend: [], used: [] }, [], t.body, res.ty))
+        { done with used: [] }
       end)
     end)
   end)

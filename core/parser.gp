@@ -194,12 +194,13 @@ fn p_type(st: PS) -> Got[TypeX]
     let ps = if is_p(adv(n.st), ")") then Got { v: [], st: adv(n.st) } else p_types(adv(n.st), []) end
     let st2 = need(need(ps.st, ")", "to close Fn parameter types"), "->", "in Fn type")
     let ret = p_type(st2)
-    Got { v: TypeX { name: "Fn", args: list_push(ps.v, ret.v) }, st: ret.st }
+    let effs = p_effects(ret.st)
+    Got { v: TypeX { name: "Fn", args: list_push(ps.v, ret.v), effects: effs.v }, st: effs.st }
   elif is_p(n.st, "[") then
     let args = p_types(adv(n.st), [])
-    Got { v: TypeX { name: n.v.text, args: args.v }, st: need(args.st, "]", "to close type arguments") }
+    Got { v: TypeX { name: n.v.text, args: args.v, effects: [] }, st: need(args.st, "]", "to close type arguments") }
   else
-    Got { v: TypeX { name: n.v.text, args: [] }, st: n.st }
+    Got { v: TypeX { name: n.v.text, args: [], effects: [] }, st: n.st }
   end
 end
 
