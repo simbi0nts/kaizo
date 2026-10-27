@@ -1,6 +1,7 @@
 # Current status
 
-Current step: 0011 implemented — targets linux-x64, windows-x64, macos-x64, macos-arm64
+Current step: 0012 done — format experiment: GPLM text beat a JSON AST (×3 tokens) and raw machine code (×21);
+              keep text. 0011 (targets linux-x64, windows-x64, macos-x64, macos-arm64) awaits CI
 Next step:    run CI on GitHub (needs a remote), fix whatever the real Windows/macOS runners report
 
 ## Quick check
@@ -19,6 +20,8 @@ make e2e        # standalone Snake + Hello web end-to-end
 2. Static type checker (closes the gaps found by the blind test, step 0006 branch).
 3. Repeat the blind test against the native core.
 4. 2b mini text browser; content-hash lockfile for libraries.
+5. `list_sort_by(l, before)` — the gap both agents hit in step 0012.
+6. Repeat step 0012 with a harder task, n >= 3 runs per arm and a second model family.
 
 ## Toolchain
 Linux x86-64 and `make`. Nothing else: `seed/kaizo` (committed Linux binary) builds the core.
@@ -35,4 +38,5 @@ tests/          core self-test + end-to-end scripts
 libs/           optional shared libraries written in GPLM
 apps/snake/     test project 1
 apps/hello-web/ test project 2
+apps/wordfreq/  written blind by an agent in step 0012 (experiment material in .dev/0012/)
 ```

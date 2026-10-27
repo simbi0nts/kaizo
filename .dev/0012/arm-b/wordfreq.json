@@ -1,0 +1,408 @@
+{
+  "imports": [],
+  "types": [
+    {"name": "Entry", "tparams": [], "is_record": true, "ctors": [],
+     "fields": [
+       {"name": "word", "ty": {"name": "String", "args": []}},
+       {"name": "count", "ty": {"name": "Int", "args": []}}
+     ]}
+  ],
+  "lets": [],
+  "fns": [
+    {"name": "is_letter",
+     "params": [{"name": "b", "ty": {"name": "Int", "args": []}}],
+     "ret": {"name": "Bool", "args": []}, "effects": [],
+     "body": [
+       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "or"}, "args": [
+         {"k": "ECall", "f": {"k": "EVar", "name": "and"}, "args": [
+           {"k": "ECall", "f": {"k": "EVar", "name": "ge"}, "args": [{"k": "EVar", "name": "b"}, {"k": "EInt", "v": 65}]},
+           {"k": "ECall", "f": {"k": "EVar", "name": "le"}, "args": [{"k": "EVar", "name": "b"}, {"k": "EInt", "v": 90}]}
+         ]},
+         {"k": "ECall", "f": {"k": "EVar", "name": "and"}, "args": [
+           {"k": "ECall", "f": {"k": "EVar", "name": "ge"}, "args": [{"k": "EVar", "name": "b"}, {"k": "EInt", "v": 97}]},
+           {"k": "ECall", "f": {"k": "EVar", "name": "le"}, "args": [{"k": "EVar", "name": "b"}, {"k": "EInt", "v": 122}]}
+         ]}
+       ]}}
+     ]},
+
+    {"name": "tokenize",
+     "params": [
+       {"name": "s", "ty": {"name": "String", "args": []}},
+       {"name": "i", "ty": {"name": "Int", "args": []}},
+       {"name": "n", "ty": {"name": "Int", "args": []}},
+       {"name": "start", "ty": {"name": "Int", "args": []}},
+       {"name": "acc", "ty": {"name": "List", "args": [{"name": "String", "args": []}]}}
+     ],
+     "ret": {"name": "List", "args": [{"name": "String", "args": []}]}, "effects": [],
+     "body": [
+       {"let_name": "", "x": {"k": "EIf",
+         "conds": [
+           {"k": "ECall", "f": {"k": "EVar", "name": "ge"}, "args": [{"k": "EVar", "name": "i"}, {"k": "EVar", "name": "n"}]},
+           {"k": "ECall", "f": {"k": "EVar", "name": "is_letter"}, "args": [
+             {"k": "ECall", "f": {"k": "EVar", "name": "str_byte"}, "args": [{"k": "EVar", "name": "s"}, {"k": "EVar", "name": "i"}]}
+           ]},
+           {"k": "ECall", "f": {"k": "EVar", "name": "ge"}, "args": [{"k": "EVar", "name": "start"}, {"k": "EInt", "v": 0}]}
+         ],
+         "thens": [
+           [
+             {"let_name": "", "x": {"k": "EIf",
+               "conds": [{"k": "ECall", "f": {"k": "EVar", "name": "ge"}, "args": [{"k": "EVar", "name": "start"}, {"k": "EInt", "v": 0}]}],
+               "thens": [[
+                 {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "list_reverse"}, "args": [
+                   {"k": "ECall", "f": {"k": "EVar", "name": "list_cons"}, "args": [
+                     {"k": "ECall", "f": {"k": "EVar", "name": "str_lower"}, "args": [
+                       {"k": "ECall", "f": {"k": "EVar", "name": "str_slice"}, "args": [{"k": "EVar", "name": "s"}, {"k": "EVar", "name": "start"}, {"k": "EVar", "name": "n"}]}
+                     ]},
+                     {"k": "EVar", "name": "acc"}
+                   ]}
+                 ]}}
+               ]],
+               "else": [
+                 {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "list_reverse"}, "args": [{"k": "EVar", "name": "acc"}]}}
+               ]}}
+           ],
+           [
+             {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "tokenize"}, "args": [
+               {"k": "EVar", "name": "s"},
+               {"k": "ECall", "f": {"k": "EVar", "name": "add"}, "args": [{"k": "EVar", "name": "i"}, {"k": "EInt", "v": 1}]},
+               {"k": "EVar", "name": "n"},
+               {"k": "EIf",
+                 "conds": [{"k": "ECall", "f": {"k": "EVar", "name": "lt"}, "args": [{"k": "EVar", "name": "start"}, {"k": "EInt", "v": 0}]}],
+                 "thens": [[{"let_name": "", "x": {"k": "EVar", "name": "i"}}]],
+                 "else": [{"let_name": "", "x": {"k": "EVar", "name": "start"}}]},
+               {"k": "EVar", "name": "acc"}
+             ]}}
+           ],
+           [
+             {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "tokenize"}, "args": [
+               {"k": "EVar", "name": "s"},
+               {"k": "ECall", "f": {"k": "EVar", "name": "add"}, "args": [{"k": "EVar", "name": "i"}, {"k": "EInt", "v": 1}]},
+               {"k": "EVar", "name": "n"},
+               {"k": "EInt", "v": -1},
+               {"k": "ECall", "f": {"k": "EVar", "name": "list_cons"}, "args": [
+                 {"k": "ECall", "f": {"k": "EVar", "name": "str_lower"}, "args": [
+                   {"k": "ECall", "f": {"k": "EVar", "name": "str_slice"}, "args": [{"k": "EVar", "name": "s"}, {"k": "EVar", "name": "start"}, {"k": "EVar", "name": "i"}]}
+                 ]},
+                 {"k": "EVar", "name": "acc"}
+               ]}
+             ]}}
+           ]
+         ],
+         "else": [
+           {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "tokenize"}, "args": [
+             {"k": "EVar", "name": "s"},
+             {"k": "ECall", "f": {"k": "EVar", "name": "add"}, "args": [{"k": "EVar", "name": "i"}, {"k": "EInt", "v": 1}]},
+             {"k": "EVar", "name": "n"},
+             {"k": "EInt", "v": -1},
+             {"k": "EVar", "name": "acc"}
+           ]}}
+         ]}}
+     ]},
+
+    {"name": "split_words",
+     "params": [{"name": "s", "ty": {"name": "String", "args": []}}],
+     "ret": {"name": "List", "args": [{"name": "String", "args": []}]}, "effects": [],
+     "body": [
+       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "tokenize"}, "args": [
+         {"k": "EVar", "name": "s"},
+         {"k": "EInt", "v": 0},
+         {"k": "ECall", "f": {"k": "EVar", "name": "str_len"}, "args": [{"k": "EVar", "name": "s"}]},
+         {"k": "EInt", "v": -1},
+         {"k": "EList", "items": []}
+       ]}}
+     ]},
+
+    {"name": "count_runs",
+     "params": [
+       {"name": "l", "ty": {"name": "List", "args": [{"name": "String", "args": []}]}},
+       {"name": "cur", "ty": {"name": "String", "args": []}},
+       {"name": "cnt", "ty": {"name": "Int", "args": []}},
+       {"name": "acc", "ty": {"name": "List", "args": [{"name": "Entry", "args": []}]}}
+     ],
+     "ret": {"name": "List", "args": [{"name": "Entry", "args": []}]}, "effects": [],
+     "body": [
+       {"let_name": "", "x": {"k": "EMatch", "x": {"k": "EVar", "name": "l"}, "arms": [
+         {"pat": {"k": "PList", "items": [], "rest": null},
+          "body": [
+            {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "list_reverse"}, "args": [
+              {"k": "ECall", "f": {"k": "EVar", "name": "list_cons"}, "args": [
+                {"k": "ERec", "type": "Entry", "fields": [
+                  {"name": "word", "x": {"k": "EVar", "name": "cur"}},
+                  {"name": "count", "x": {"k": "EVar", "name": "cnt"}}
+                ]},
+                {"k": "EVar", "name": "acc"}
+              ]}
+            ]}}
+          ]},
+         {"pat": {"k": "PList", "items": [{"k": "PVar", "name": "w"}], "rest": {"k": "PVar", "name": "rest"}},
+          "body": [
+            {"let_name": "", "x": {"k": "EIf",
+              "conds": [{"k": "ECall", "f": {"k": "EVar", "name": "eq"}, "args": [{"k": "EVar", "name": "w"}, {"k": "EVar", "name": "cur"}]}],
+              "thens": [[
+                {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "count_runs"}, "args": [
+                  {"k": "EVar", "name": "rest"},
+                  {"k": "EVar", "name": "cur"},
+                  {"k": "ECall", "f": {"k": "EVar", "name": "add"}, "args": [{"k": "EVar", "name": "cnt"}, {"k": "EInt", "v": 1}]},
+                  {"k": "EVar", "name": "acc"}
+                ]}}
+              ]],
+              "else": [
+                {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "count_runs"}, "args": [
+                  {"k": "EVar", "name": "rest"},
+                  {"k": "EVar", "name": "w"},
+                  {"k": "EInt", "v": 1},
+                  {"k": "ECall", "f": {"k": "EVar", "name": "list_cons"}, "args": [
+                    {"k": "ERec", "type": "Entry", "fields": [
+                      {"name": "word", "x": {"k": "EVar", "name": "cur"}},
+                      {"name": "count", "x": {"k": "EVar", "name": "cnt"}}
+                    ]},
+                    {"k": "EVar", "name": "acc"}
+                  ]}
+                ]}}
+              ]}}
+          ]}
+       ]}}
+     ]},
+
+    {"name": "count_words",
+     "params": [{"name": "words", "ty": {"name": "List", "args": [{"name": "String", "args": []}]}}],
+     "ret": {"name": "List", "args": [{"name": "Entry", "args": []}]}, "effects": [],
+     "body": [
+       {"let_name": "", "x": {"k": "EMatch",
+         "x": {"k": "ECall", "f": {"k": "EVar", "name": "list_sort"}, "args": [{"k": "EVar", "name": "words"}]},
+         "arms": [
+           {"pat": {"k": "PList", "items": [], "rest": null},
+            "body": [{"let_name": "", "x": {"k": "EList", "items": []}}]},
+           {"pat": {"k": "PList", "items": [{"k": "PVar", "name": "w"}], "rest": {"k": "PVar", "name": "rest"}},
+            "body": [
+              {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "count_runs"}, "args": [
+                {"k": "EVar", "name": "rest"},
+                {"k": "EVar", "name": "w"},
+                {"k": "EInt", "v": 1},
+                {"k": "EList", "items": []}
+              ]}}
+            ]}
+         ]}}
+     ]},
+
+    {"name": "before",
+     "params": [
+       {"name": "a", "ty": {"name": "Entry", "args": []}},
+       {"name": "b", "ty": {"name": "Entry", "args": []}}
+     ],
+     "ret": {"name": "Bool", "args": []}, "effects": [],
+     "body": [
+       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "or"}, "args": [
+         {"k": "ECall", "f": {"k": "EVar", "name": "gt"}, "args": [
+           {"k": "EField", "x": {"k": "EVar", "name": "a"}, "name": "count"},
+           {"k": "EField", "x": {"k": "EVar", "name": "b"}, "name": "count"}
+         ]},
+         {"k": "ECall", "f": {"k": "EVar", "name": "and"}, "args": [
+           {"k": "ECall", "f": {"k": "EVar", "name": "eq"}, "args": [
+             {"k": "EField", "x": {"k": "EVar", "name": "a"}, "name": "count"},
+             {"k": "EField", "x": {"k": "EVar", "name": "b"}, "name": "count"}
+           ]},
+           {"k": "ECall", "f": {"k": "EVar", "name": "lt"}, "args": [
+             {"k": "EField", "x": {"k": "EVar", "name": "a"}, "name": "word"},
+             {"k": "EField", "x": {"k": "EVar", "name": "b"}, "name": "word"}
+           ]}
+         ]}
+       ]}}
+     ]},
+
+    {"name": "merge",
+     "params": [
+       {"name": "xs", "ty": {"name": "List", "args": [{"name": "Entry", "args": []}]}},
+       {"name": "ys", "ty": {"name": "List", "args": [{"name": "Entry", "args": []}]}},
+       {"name": "acc", "ty": {"name": "List", "args": [{"name": "Entry", "args": []}]}}
+     ],
+     "ret": {"name": "List", "args": [{"name": "Entry", "args": []}]}, "effects": [],
+     "body": [
+       {"let_name": "", "x": {"k": "EMatch", "x": {"k": "EVar", "name": "xs"}, "arms": [
+         {"pat": {"k": "PList", "items": [], "rest": null},
+          "body": [
+            {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "list_concat"}, "args": [
+              {"k": "ECall", "f": {"k": "EVar", "name": "list_reverse"}, "args": [{"k": "EVar", "name": "acc"}]},
+              {"k": "EVar", "name": "ys"}
+            ]}}
+          ]},
+         {"pat": {"k": "PList", "items": [{"k": "PVar", "name": "x"}], "rest": {"k": "PVar", "name": "xr"}},
+          "body": [
+            {"let_name": "", "x": {"k": "EMatch", "x": {"k": "EVar", "name": "ys"}, "arms": [
+              {"pat": {"k": "PList", "items": [], "rest": null},
+               "body": [
+                 {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "list_concat"}, "args": [
+                   {"k": "ECall", "f": {"k": "EVar", "name": "list_reverse"}, "args": [{"k": "EVar", "name": "acc"}]},
+                   {"k": "EVar", "name": "xs"}
+                 ]}}
+               ]},
+              {"pat": {"k": "PList", "items": [{"k": "PVar", "name": "y"}], "rest": {"k": "PVar", "name": "yr"}},
+               "body": [
+                 {"let_name": "", "x": {"k": "EIf",
+                   "conds": [{"k": "ECall", "f": {"k": "EVar", "name": "before"}, "args": [{"k": "EVar", "name": "y"}, {"k": "EVar", "name": "x"}]}],
+                   "thens": [[
+                     {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "merge"}, "args": [
+                       {"k": "EVar", "name": "xs"},
+                       {"k": "EVar", "name": "yr"},
+                       {"k": "ECall", "f": {"k": "EVar", "name": "list_cons"}, "args": [{"k": "EVar", "name": "y"}, {"k": "EVar", "name": "acc"}]}
+                     ]}}
+                   ]],
+                   "else": [
+                     {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "merge"}, "args": [
+                       {"k": "EVar", "name": "xr"},
+                       {"k": "EVar", "name": "ys"},
+                       {"k": "ECall", "f": {"k": "EVar", "name": "list_cons"}, "args": [{"k": "EVar", "name": "x"}, {"k": "EVar", "name": "acc"}]}
+                     ]}}
+                   ]}}
+               ]}
+            ]}}
+          ]}
+       ]}}
+     ]},
+
+    {"name": "msort",
+     "params": [{"name": "l", "ty": {"name": "List", "args": [{"name": "Entry", "args": []}]}}],
+     "ret": {"name": "List", "args": [{"name": "Entry", "args": []}]}, "effects": [],
+     "body": [
+       {"let_name": "n", "x": {"k": "ECall", "f": {"k": "EVar", "name": "list_len"}, "args": [{"k": "EVar", "name": "l"}]}},
+       {"let_name": "", "x": {"k": "EIf",
+         "conds": [{"k": "ECall", "f": {"k": "EVar", "name": "le"}, "args": [{"k": "EVar", "name": "n"}, {"k": "EInt", "v": 1}]}],
+         "thens": [[{"let_name": "", "x": {"k": "EVar", "name": "l"}}]],
+         "else": [
+           {"let_name": "h", "x": {"k": "ECall", "f": {"k": "EVar", "name": "div"}, "args": [{"k": "EVar", "name": "n"}, {"k": "EInt", "v": 2}]}},
+           {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "merge"}, "args": [
+             {"k": "ECall", "f": {"k": "EVar", "name": "msort"}, "args": [
+               {"k": "ECall", "f": {"k": "EVar", "name": "list_slice"}, "args": [{"k": "EVar", "name": "l"}, {"k": "EInt", "v": 0}, {"k": "EVar", "name": "h"}]}
+             ]},
+             {"k": "ECall", "f": {"k": "EVar", "name": "msort"}, "args": [
+               {"k": "ECall", "f": {"k": "EVar", "name": "list_slice"}, "args": [{"k": "EVar", "name": "l"}, {"k": "EVar", "name": "h"}, {"k": "EVar", "name": "n"}]}
+             ]},
+             {"k": "EList", "items": []}
+           ]}}
+         ]}}
+     ]},
+
+    {"name": "top_lines",
+     "params": [{"name": "text", "ty": {"name": "String", "args": []}}],
+     "ret": {"name": "List", "args": [{"name": "String", "args": []}]}, "effects": [],
+     "body": [
+       {"let_name": "entries", "x": {"k": "ECall", "f": {"k": "EVar", "name": "msort"}, "args": [
+         {"k": "ECall", "f": {"k": "EVar", "name": "count_words"}, "args": [
+           {"k": "ECall", "f": {"k": "EVar", "name": "split_words"}, "args": [{"k": "EVar", "name": "text"}]}
+         ]}
+       ]}},
+       {"let_name": "top", "x": {"k": "ECall", "f": {"k": "EVar", "name": "list_slice"}, "args": [
+         {"k": "EVar", "name": "entries"},
+         {"k": "EInt", "v": 0},
+         {"k": "ECall", "f": {"k": "EVar", "name": "min"}, "args": [
+           {"k": "EInt", "v": 10},
+           {"k": "ECall", "f": {"k": "EVar", "name": "list_len"}, "args": [{"k": "EVar", "name": "entries"}]}
+         ]}
+       ]}},
+       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "list_map"}, "args": [
+         {"k": "EVar", "name": "top"},
+         {"k": "ELam", "params": ["e"], "body": [
+           {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "str_cat"}, "args": [
+             {"k": "ECall", "f": {"k": "EVar", "name": "str_cat"}, "args": [
+               {"k": "ECall", "f": {"k": "EVar", "name": "show"}, "args": [{"k": "EField", "x": {"k": "EVar", "name": "e"}, "name": "count"}]},
+               {"k": "EStr", "v": " "}
+             ]},
+             {"k": "EField", "x": {"k": "EVar", "name": "e"}, "name": "word"}
+           ]}}
+         ]}
+       ]}}
+     ]},
+
+    {"name": "main", "params": [], "ret": {"name": "Unit", "args": []}, "effects": ["io", "fs"],
+     "body": [
+       {"let_name": "a", "x": {"k": "ECall", "f": {"k": "EVar", "name": "args"}, "args": []}},
+       {"let_name": "", "x": {"k": "EMatch", "x": {"k": "EVar", "name": "a"}, "arms": [
+         {"pat": {"k": "PList", "items": [], "rest": null},
+          "body": [
+            {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "println"}, "args": [{"k": "EStr", "v": "usage: wordfreq <file>"}]}},
+            {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "exit"}, "args": [{"k": "EInt", "v": 2}]}},
+            {"let_name": "", "x": {"k": "ECtor", "name": "Unit"}}
+          ]},
+         {"pat": {"k": "PList", "items": [{"k": "PVar", "name": "p"}], "rest": {"k": "PWild"}},
+          "body": [
+            {"let_name": "", "x": {"k": "EMatch",
+              "x": {"k": "ECall", "f": {"k": "EVar", "name": "read_file"}, "args": [{"k": "EVar", "name": "p"}]},
+              "arms": [
+                {"pat": {"k": "PCtor", "name": "Err", "args": [{"k": "PWild"}]},
+                 "body": [
+                   {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "println"}, "args": [
+                     {"k": "ECall", "f": {"k": "EVar", "name": "str_cat"}, "args": [{"k": "EStr", "v": "error: cannot read "}, {"k": "EVar", "name": "p"}]}
+                   ]}},
+                   {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "exit"}, "args": [{"k": "EInt", "v": 1}]}},
+                   {"let_name": "", "x": {"k": "ECtor", "name": "Unit"}}
+                 ]},
+                {"pat": {"k": "PCtor", "name": "Ok", "args": [{"k": "PVar", "name": "text"}]},
+                 "body": [
+                   {"let_name": "lines", "x": {"k": "ECall", "f": {"k": "EVar", "name": "top_lines"}, "args": [{"k": "EVar", "name": "text"}]}},
+                   {"let_name": "", "x": {"k": "EIf",
+                     "conds": [{"k": "ECall", "f": {"k": "EVar", "name": "gt"}, "args": [
+                       {"k": "ECall", "f": {"k": "EVar", "name": "list_len"}, "args": [{"k": "EVar", "name": "lines"}]},
+                       {"k": "EInt", "v": 0}
+                     ]}],
+                     "thens": [[
+                       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "println"}, "args": [
+                         {"k": "ECall", "f": {"k": "EVar", "name": "str_join"}, "args": [{"k": "EVar", "name": "lines"}, {"k": "EStr", "v": "\n"}]}
+                       ]}}
+                     ]],
+                     "else": [{"let_name": "", "x": {"k": "ECtor", "name": "Unit"}}]}}
+                 ]}
+              ]}}
+          ]}
+       ]}}
+     ]}
+  ],
+  "tests": [
+    {"name": "split words on non-letters and lower-case them",
+     "body": [
+       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "expect_eq"}, "args": [
+         {"k": "ECall", "f": {"k": "EVar", "name": "split_words"}, "args": [{"k": "EStr", "v": "Don't stop-me 42 NOW!x"}]},
+         {"k": "EList", "items": [
+           {"k": "EStr", "v": "don"}, {"k": "EStr", "v": "t"}, {"k": "EStr", "v": "stop"},
+           {"k": "EStr", "v": "me"}, {"k": "EStr", "v": "now"}, {"k": "EStr", "v": "x"}
+         ]}
+       ]}},
+       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "expect_eq"}, "args": [
+         {"k": "ECall", "f": {"k": "EVar", "name": "split_words"}, "args": [{"k": "EStr", "v": "123 ... !!"}]},
+         {"k": "EList", "items": []}
+       ]}}
+     ]},
+    {"name": "count words",
+     "body": [
+       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "expect_eq"}, "args": [
+         {"k": "ECall", "f": {"k": "EVar", "name": "count_words"}, "args": [
+           {"k": "EList", "items": [{"k": "EStr", "v": "b"}, {"k": "EStr", "v": "a"}, {"k": "EStr", "v": "b"}]}
+         ]},
+         {"k": "EList", "items": [
+           {"k": "ERec", "type": "Entry", "fields": [{"name": "word", "x": {"k": "EStr", "v": "a"}}, {"name": "count", "x": {"k": "EInt", "v": 1}}]},
+           {"k": "ERec", "type": "Entry", "fields": [{"name": "word", "x": {"k": "EStr", "v": "b"}}, {"name": "count", "x": {"k": "EInt", "v": 2}}]}
+         ]}
+       ]}}
+     ]},
+    {"name": "ordering of the example",
+     "body": [
+       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "expect_eq"}, "args": [
+         {"k": "ECall", "f": {"k": "EVar", "name": "top_lines"}, "args": [{"k": "EStr", "v": "The cat and the hat. The cat sat!\nA hat, a cat; THE END.\n"}]},
+         {"k": "EList", "items": [
+           {"k": "EStr", "v": "4 the"}, {"k": "EStr", "v": "3 cat"}, {"k": "EStr", "v": "2 a"}, {"k": "EStr", "v": "2 hat"},
+           {"k": "EStr", "v": "1 and"}, {"k": "EStr", "v": "1 end"}, {"k": "EStr", "v": "1 sat"}
+         ]}
+       ]}}
+     ]},
+    {"name": "ties and limit of ten",
+     "body": [
+       {"let_name": "", "x": {"k": "ECall", "f": {"k": "EVar", "name": "expect_eq"}, "args": [
+         {"k": "ECall", "f": {"k": "EVar", "name": "top_lines"}, "args": [{"k": "EStr", "v": "l k j i h g f e d c b a z z"}]},
+         {"k": "EList", "items": [
+           {"k": "EStr", "v": "2 z"}, {"k": "EStr", "v": "1 a"}, {"k": "EStr", "v": "1 b"}, {"k": "EStr", "v": "1 c"},
+           {"k": "EStr", "v": "1 d"}, {"k": "EStr", "v": "1 e"}, {"k": "EStr", "v": "1 f"}, {"k": "EStr", "v": "1 g"},
+           {"k": "EStr", "v": "1 h"}, {"k": "EStr", "v": "1 i"}
+         ]}
+       ]}}
+     ]}
+  ]
+}
