@@ -1,0 +1,8 @@
+# build outputs
+/build/
+*.o
+*.out
+# local editor / OS noise
+.vscode/
+.idea/
+.DS_Store
