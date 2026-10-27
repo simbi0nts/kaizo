@@ -1,0 +1,140 @@
+# Linux x86-64 ELF executable: topword
+# Reads stdin (<=4096), prints most frequent word (ties: earliest first occurrence), exit 0.
+# Non-PIE ET_EXEC, single RWX PT_LOAD at 0x400000. Code at file off 0x78 (vaddr 0x400078).
+# Data (BSS, zero-filled by memsz): BUF=0x410000 WORDS=0x412000 COUNT=0x414000 NW=0x416000 TMP=0x416010
+
+# ---- ELF header (64 bytes) ----
+7F 45 4C 46 02 01 01 00 00 00 00 00 00 00 00 00   # magic, 64-bit, LE, SysV
+02 00 3E 00 01 00 00 00 78 00 40 00 00 00 00 00   # ET_EXEC, x86-64, ver1, entry=0x400078
+40 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   # phoff=0x40, shoff=0
+00 00 00 00 40 00 38 00 01 00 00 00 00 00 00 00   # flags=0, ehsize=64, phentsize=56, phnum=1, sh*=0
+
+# ---- Program header (56 bytes) PT_LOAD RWX ----
+01 00 00 00 07 00 00 00 00 00 00 00 00 00 00 00   # PT_LOAD, flags=7, offset=0
+00 00 40 00 00 00 00 00 00 00 40 00 00 00 00 00   # vaddr=0x400000, paddr=0x400000
+21 02 00 00 00 00 00 00 00 70 01 00 00 00 00 00   # filesz=0x221, memsz=0x17000
+00 10 00 00 00 00 00 00                           # align=0x1000
+
+# ---- code @ 0x400078 ----
+# read(0, BUF, 4096)
+31 FF                                             # I1  xor edi,edi        (fd=0)
+BE 00 00 41 00                                    # I2  mov esi,0x410000   (BUF)
+BA 00 10 00 00                                    # I3  mov edx,4096
+31 C0                                             # I4  xor eax,eax        (read)
+0F 05                                             # I5  syscall            (rax=n)
+48 8D 1C 06                                       # I6  lea rbx,[rsi+rax]  (end=BUF+n)
+48 C7 04 25 00 60 41 00 00 00 00 00               # I7  mov qword[NW],0
+
+# skip_loop @32
+48 39 DE                                          # I8  cmp rsi,rbx
+0F 87 F4 00 00 00                                 # I9  ja/jae done_parse  (rsi>=end)
+0F B6 06                                          # I10 movzx eax,byte[rsi]
+3C 61                                             # I11 cmp al,'a'
+72 06                                             # I12 jb notletter
+3C 7A                                             # I13 cmp al,'z'
+77 02                                             # I14 ja notletter
+EB 05                                             # I15 jmp wordstart
+# notletter @54
+48 FF C6                                          # I16 inc rsi
+EB E5                                             # I17 jmp skip_loop
+# wordstart @59
+BF 11 60 41 00                                    # I18 mov edi,0x416011   (dest=TMP+1)
+45 31 C0                                          # I19 xor r8d,r8d         (len=0)
+# collect @67
+48 39 DE                                          # I20 cmp rsi,rbx
+73 18                                             # I21 jae wordend
+0F B6 06                                          # I22 movzx eax,byte[rsi]
+3C 61                                             # I23 cmp al,'a'
+72 11                                             # I24 jb wordend
+3C 7A                                             # I25 cmp al,'z'
+77 0D                                             # I26 ja wordend
+88 07                                             # I27 mov [rdi],al
+48 FF C7                                          # I28 inc rdi
+48 FF C6                                          # I29 inc rsi
+49 FF C0                                          # I30 inc r8
+EB E3                                             # I31 jmp collect
+# wordend @96
+44 88 04 25 10 60 41 00                           # I32 mov [TMP],r8b       (store len)
+45 31 C9                                          # I33 xor r9d,r9d         (i=0)
+# lookup_loop @107
+48 8B 04 25 00 60 41 00                           # I34 mov rax,[NW]
+49 39 C1                                          # I35 cmp r9,rax
+0F 83 53 00 00 00                                 # I36 jae insert          (i>=NW)
+4C 89 C8                                          # I37 mov rax,r9
+48 6B C0 28                                       # I38 imul rax,rax,40
+48 05 00 20 41 00                                 # I39 add rax,0x412000    (slot)
+0F B6 10                                          # I40 movzx edx,byte[rax]  (slot len)
+44 38 C2                                          # I41 cmp dl,r8b
+0F 85 32 00 00 00                                 # I42 jne lookup_next
+31 C9                                             # I43 xor ecx,ecx         (k=0)
+# cmpchars @151
+4C 39 C1                                          # I44 cmp rcx,r8
+0F 83 1A 00 00 00                                 # I45 jae found           (k>=len)
+8A 54 08 01                                       # I46 mov dl,[rax+rcx+1]
+44 8A 14 0D 11 60 41 00                           # I47 mov r10b,[TMP+1+rcx]
+44 38 D2                                          # I48 cmp dl,r10b
+0F 85 12 00 00 00                                 # I49 jne lookup_next
+48 FF C1                                          # I50 inc rcx
+EB DD                                             # I51 jmp cmpchars
+# found @186
+4A FF 04 CD 00 40 41 00                           # I52 inc qword[COUNT+r9*8]
+E9 59 FF FF FF                                    # I53 jmp skip_loop
+# lookup_next @199
+49 FF C1                                          # I54 inc r9
+E9 9C FF FF FF                                    # I55 jmp lookup_loop
+# insert @207
+4C 8B 0C 25 00 60 41 00                           # I56 mov r9,[NW]
+4C 89 C8                                          # I57 mov rax,r9
+48 6B C0 28                                       # I58 imul rax,rax,40
+48 05 00 20 41 00                                 # I59 add rax,0x412000
+44 88 00                                          # I60 mov [rax],r8b        (store len)
+31 C9                                             # I61 xor ecx,ecx          (k=0)
+# copyloop @233
+4C 39 C1                                          # I62 cmp rcx,r8
+0F 83 12 00 00 00                                 # I63 jae copydone
+44 8A 14 0D 11 60 41 00                           # I64 mov r10b,[TMP+1+rcx]
+44 88 54 08 01                                    # I65 mov [rax+rcx+1],r10b
+48 FF C1                                          # I66 inc rcx
+EB E5                                             # I67 jmp copyloop
+# copydone @260
+4A C7 04 CD 00 40 41 00 01 00 00 00               # I68 mov qword[COUNT+r9*8],1
+48 FF 04 25 00 60 41 00                           # I69 inc qword[NW]
+E9 03 FF FF FF                                    # I70 jmp skip_loop
+# done_parse @285
+45 31 C0                                          # I71 xor r8d,r8d          (best=0)
+49 C7 C2 FF FF FF FF                              # I72 mov r10,-1           (bestidx=-1)
+45 31 C9                                          # I73 xor r9d,r9d          (i=0)
+# best_loop @298
+48 8B 04 25 00 60 41 00                           # I74 mov rax,[NW]
+49 39 C1                                          # I75 cmp r9,rax
+0F 83 1B 00 00 00                                 # I76 jae best_done
+4A 8B 14 CD 00 40 41 00                           # I77 mov rdx,[COUNT+r9*8]
+4C 39 C2                                          # I78 cmp rdx,r8
+76 06                                             # I79 jbe best_next        (count<=best)
+49 89 D0                                          # I80 mov r8,rdx           (best=count)
+4D 89 CA                                          # I81 mov r10,r9           (bestidx=i)
+# best_next @334
+49 FF C1                                          # I82 inc r9
+E9 D4 FF FF FF                                    # I83 jmp best_loop
+# best_done @342
+49 83 FA FF                                       # I84 cmp r10,-1
+0F 84 40 00 00 00                                 # I85 je noout             (no words)
+4C 89 D0                                          # I86 mov rax,r10
+48 6B C0 28                                       # I87 imul rax,rax,40
+48 05 00 20 41 00                                 # I88 add rax,0x412000
+0F B6 10                                          # I89 movzx edx,byte[rax]  (len)
+48 89 C6                                          # I90 mov rsi,rax
+48 FF C6                                          # I91 inc rsi              (buf=slot+1)
+BF 01 00 00 00                                    # I92 mov edi,1
+B8 01 00 00 00                                    # I93 mov eax,1            (write)
+0F 05                                             # I94 syscall              write(1,word,len)
+C6 04 25 10 60 41 00 0A                           # I95 mov byte[TMP],10     ('\n')
+BF 01 00 00 00                                    # I96 mov edi,1
+BE 10 60 41 00                                    # I97 mov esi,0x416010
+BA 01 00 00 00                                    # I98 mov edx,1
+B8 01 00 00 00                                    # I99 mov eax,1
+0F 05                                             # I100 syscall             write(1,"\n",1)
+# noout @416
+31 FF                                             # I101 xor edi,edi
+B8 3C 00 00 00                                    # I102 mov eax,60          (exit)
+0F 05                                             # I103 syscall             exit(0)

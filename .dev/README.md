@@ -50,3 +50,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0013](0013-reference-counting.md) | Compiler-inferred reference counting | done |
 | [0014](0014-snake-gui.md) | Snake with a GUI (X11 protocol in GPLM) | done |
 | [0015](0015-demo3d.md) | 3D demo scene: software renderer in GPLM | done |
+| [0016](0016-format-experiment.md) | Experiment: GPLM text vs JSON AST vs raw x86 as agent output | done |
