@@ -1,6 +1,6 @@
 # Current status
 
-Current step: 0014 done — GUI Snake on X11 (libs/x11, libs/snake)
+Current step: 0015 done — 3D demo scene (software renderer, X11)
 Next step:    run CI on GitHub; then the static type checker
 
 ## Quick check

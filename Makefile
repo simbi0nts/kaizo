@@ -1,7 +1,7 @@
 # Kaizo build. No host language: the committed seed binary compiles the GPLM core.
 SEED   := seed/kaizo
 KAIZO  := build/kaizo
-SUITES := tests/selftest.gp libs/rand libs/http libs/map libs/sha256 libs/snake libs/x11 apps/snake/main.gp apps/snake-gui/main.gp apps/hello-web/main.gp
+SUITES := tests/selftest.gp libs/rand libs/http libs/map libs/sha256 libs/snake libs/x11 apps/snake/main.gp apps/snake-gui/main.gp apps/demo3d/main.gp apps/hello-web/main.gp
 
 .PHONY: all core test selfhost e2e gui seed clean
 all: core test
@@ -29,6 +29,6 @@ seed: selfhost
 clean:
 	rm -rf build
 
-# GUI Snake on the current X display
+# GUI apps (Snake, 3D demo) on the current X display
 gui: core
-	./tests/gui_snake.sh
+	./tests/gui.sh

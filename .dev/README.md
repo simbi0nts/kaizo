@@ -47,3 +47,4 @@ Status: done | in progress | proposal (waiting for human decision)
 | [0012](0012-hex-literals.md) | Hexadecimal integer literals; compiler constants in hex | done |
 | [0013](0013-reference-counting.md) | Compiler-inferred reference counting | done |
 | [0014](0014-snake-gui.md) | Snake with a GUI (X11 protocol in GPLM) | done |
+| [0015](0015-demo3d.md) | 3D demo scene: software renderer in GPLM | done |

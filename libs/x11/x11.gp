@@ -172,6 +172,22 @@ fn text(x: X, rgb: Int, px: Int, py: Int, s: String) -> String
   str_cat(color(x, rgb), request(76, n, cat_all([lbytes(x.win, 4), lbytes(x.gc, 4), lbytes(px, 2), lbytes(py, 2), bytes(str_slice(s, 0, n)), pad(n)])))
 end
 
+# 24-bit colour as one 32-bit ZPixmap pixel (little-endian BGRX)
+fn pixel(rgb: Int) -> String
+  str_from_bytes([bit_and(rgb, 255), bit_and(bit_shr(rgb, 8), 255), bit_and(bit_shr(rgb, 16), 255), 0])
+end
+
+# an image of w x h pixels (rows of 4*w bytes) at (px, py); split into strips below the 256 KiB request limit
+fn image(x: X, px: Int, py: Int, w: Int, h: Int, data: String) -> List[String]
+  let per = max(1, div(240000, mul(w, 4)))
+  list_map(list_range(0, div(add(h, sub(per, 1)), per)), fn(i)
+    let y0 = mul(i, per)
+    let rows = min(per, sub(h, y0))
+    let part = str_slice(data, mul(mul(y0, w), 4), mul(mul(add(y0, rows), w), 4))
+    request(72, 2, cat_all([lbytes(x.win, 4), lbytes(x.gc, 4), lbytes(w, 2), lbytes(rows, 2), lbytes(px, 2), lbytes(add(py, y0), 2), [0, 24, 0, 0], bytes(part)]))
+  end)
+end
+
 # ---------- events ----------
 
 # key names for the standard Linux (evdev) keycodes
@@ -241,6 +257,16 @@ test "xauthority entry"
   let entry = str_from_bytes(cat_all([[1, 0], [0, 2], bytes("pc"), [0, 1], bytes("0"), [0, 18], bytes("MIT-MAGIC-COOKIE-1"), [0, 3], [7, 8, 9]]))
   expect_eq(find_auth(entry, 0, "0"), Some(Auth { name: "MIT-MAGIC-COOKIE-1", data: str_from_bytes([7, 8, 9]) }))
   expect_eq(find_auth(entry, 0, "1"), None)
+end
+
+test "pixel is BGRX"
+  expect_eq(bytes(pixel(0x112233)), [0x33, 0x22, 0x11, 0])
+end
+
+test "image strips stay below the request limit"
+  let reqs = image(X { sock: Unit, root: 1, id_base: 0, win: 2, gc: 3, font: 4, buf: "" }, 0, 0, 640, 400, str_repeat(pixel(0), mul(640, 400)))
+  expect_eq(list_len(reqs), 5)
+  expect(lt(str_len(unwrap_or(list_get(reqs, 0), "")), 262140), "strip fits")
 end
 
 test "events"
