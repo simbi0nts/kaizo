@@ -1,10 +1,10 @@
 # Current status
 
-Current step: 0022 done — Phase 1 complete (static types + effect types; exit criterion met)
-Next step:    0023 — `kaizo eval` harness (Phase 2)
+Current step: 0023 done — eval harness; batch 1: tie on correctness (8/8), GPLM costlier
+Next step:    harder eval specs (batch 2), then Phase 3 libraries
 
 ## Reserved steps
-0023 — eval harness: specs, hidden tests, scoring, agent protocol (this session)
+(none)
 
 ## Quick check
 ```

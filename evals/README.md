@@ -14,9 +14,14 @@ acceptance test). `score.sh <spec> <command...>` runs a candidate against the hi
    hidden test — only the *name* and diff of the first failing case). That is one **fix round**.
    At most 3 fix rounds.
 4. Record one line in `results.jsonl`:
-   `{"date", "spec", "arm", "model", "output_tokens", "fix_rounds", "hidden_passed", "hidden_total",
-     "check_errors", "runtime_errors", "notes"}`.
+   `{"date", "batch", "spec", "arm", "model", "total_tokens", "wall_s", "lines", "fix_rounds", "hidden_passed",
+     "hidden_total", "check_errors", "runtime_errors", "notes"}`; candidates go to `runs/<date>-<batch>/`.
 5. `python3 evals/report.py` prints the comparison table.
 
 The point is the comparison under identical conditions, so keep the prompts, the feedback and the
 limits the same for every arm. Change the protocol only with a new .dev step.
+
+## Tools
+- `judge.sh <gplm|python> <spec> <file>` — step 2 for one candidate; prints the feedback for a fix round.
+- `extract.py <transcript.jsonl> <out>` — takes the agent's code block out of its transcript.
+- `run_py_tests.py <file>` — runs a Python candidate's `test_*` functions.

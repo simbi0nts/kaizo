@@ -67,3 +67,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0020](0020-type-checker.md) | Static type checker: inference, generics, records | done |
 | [0021](0021-effect-types.md) | Function types carry effects | done |
 | [0022](0022-phase1-exit.md) | Phase 1 exit: blind-test mistakes now all caught before run time | done |
+| [0023](0023-eval-harness.md) | Eval harness + batch 1: GPLM vs Python, 8/8 solved, GPLM 2.2x slower | done |
