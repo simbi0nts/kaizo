@@ -75,3 +75,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0028](0028-haiku-rerun.md) | Haiku GPLM re-run: 10/12 first try, fixed errors gone; operator and naming hints | done |
 | [0029](0029-infix-operators.md) | T1a: infix operators + grouping, desugared to builtins | done |
 | [0030](0030-benchmarks.md) | Benchmarks vs C/Rust: server 0.77x, render3d 17x, game 243x slower | done |
+| [0031](0031-perf-quick-wins.md) | Sampling profiler; fast equality, bulk copy, slice views: game 243x→53x vs C | done |

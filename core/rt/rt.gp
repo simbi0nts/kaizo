@@ -110,6 +110,11 @@ fn same(a: Int, b: Int) -> Bool
 end
 
 fn equal(a: Int, b: Int) -> Bool
+  let k = prim_eq_flat(a, b)
+  if eq(k, 0) then true elif eq(k, 1) then false else equal_deep(a, b) end
+end
+
+fn equal_deep(a: Int, b: Int) -> Bool
   let ta = prim_tag(a)
   if ne(ta, prim_tag(b)) then false
   elif eq(ta, 0) then eq(a, b)
@@ -132,8 +137,13 @@ end
 
 fn slots_eq(a: Int, b: Int, i: Int, n: Int) -> Bool
   if ge(i, n) then true
-  elif equal(prim_slot(a, i), prim_slot(b, i)) then slots_eq(a, b, add(i, 1), n)
-  else false
+  else
+    let k = prim_slot_cmp(a, b, i)
+    if eq(k, 0) then slots_eq(a, b, add(i, 1), n)
+    elif eq(k, 1) then false
+    elif equal(prim_slot(a, i), prim_slot(b, i)) then slots_eq(a, b, add(i, 1), n)
+    else false
+    end
   end
 end
 
@@ -416,8 +426,8 @@ end
 
 fn copy_into(dst: List[Int], doff: Int, src: List[Int], i: Int, n: Int) -> List[Int]
   if ge(i, n) then dst else
-    prim_set_slot(dst, add(doff, i), prim_slot(src, i))
-    copy_into(dst, doff, src, add(i, 1), n)
+    prim_copy_slots(dst, add(doff, i), src, i, sub(n, i))
+    dst
   end
 end
 
@@ -448,7 +458,7 @@ fn list_slice(l: List[Int], from: Int, to: Int) -> List[Int]
   let n = prim_len(l)
   let f = clamp(from, 0, n)
   let t = clamp(to, f, n)
-  copy_into(prim_list_new(sub(t, f)), 0, prim_list_view(l, f, sub(t, f)), 0, sub(t, f))
+  prim_list_view(l, f, sub(t, f))
 end
 
 fn rev_fill(r: List[Int], l: List[Int], i: Int, n: Int) -> List[Int]
@@ -475,7 +485,8 @@ fn list_range(from: Int, to: Int) -> List[Int]
 end
 
 fn contains_loop(l: List[Int], x: Int, i: Int, n: Int) -> Bool
-  if ge(i, n) then false elif equal(prim_slot(l, i), x) then true else contains_loop(l, x, add(i, 1), n) end
+  let j = prim_find_flat(l, x, i, n)
+  if ge(j, n) then false elif equal(prim_slot(l, j), x) then true else contains_loop(l, x, add(j, 1), n) end
 end
 
 fn list_contains(l: List[Int], x: Int) -> Bool

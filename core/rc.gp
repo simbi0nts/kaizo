@@ -54,6 +54,8 @@ end
 # argument positions in which intrinsics only read (borrow) their argument
 fn borrow_positions(name: String) -> List[Int]
   if eq(name, "prim_copy") then [0, 2]
+  elif list_contains(["prim_slot_cmp", "prim_eq_flat", "prim_find_flat"], name) then [0, 1]
+  elif eq(name, "prim_copy_slots") then [0, 2]
   elif list_contains(["prim_tag", "prim_len", "prim_id", "prim_slot", "prim_set_slot", "prim_byte", "prim_set_byte", "prim_list_view",
     "prim_record_copy", "prim_addr", "prim_ctor_name", "prim_record_name", "prim_field_name", "prim_term_save"], name) then [0]
   else []

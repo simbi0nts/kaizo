@@ -1,7 +1,7 @@
 # Current status
 
-Current step: 0030 done — benchmarks vs C/Rust: server 0.77x, render3d 17x, game 243x slower (56x same algorithm)
-Next step:    T1b (loops, char literals, interpolation) or performance (arrays/maps, unboxed Int codegen)
+Current step: 0031 done — profiler + runtime quick wins: game 243x→53x vs C; render3d 17x (needs in-place updates)
+Next step:    in-place update of uniquely owned values (list_set/push, record update), then allocation reuse
 
 ## Reserved steps
 

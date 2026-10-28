@@ -886,6 +886,24 @@ fn push_all(cx: Cx, g: G, env: List[Bind], args: List[Expr]) -> G
   push_args(cx, g, env, args)
 end
 
+# compares the values in rcx and rax; clobbers rcx, rdx, r8, r9, r10; jumps to one of the labels
+fn eq_flat_code(g: G, eql: String, nel: String, deep: String) -> G
+  let rec = new_label(g)
+  let lp = new_label(rec.g)
+  let dif = new_label(lp.g)
+  emit(dif.g, cat([CI(op_rr(57, rcx, rax)), jcc(cc_e, eql),
+    CI(list_concat(list_concat(mov_rr(rdx, rcx), op_rr(9, rdx, rax)), test_low(rdx, 1))), jcc(cc_ne, nel),
+    CI(list_concat(list_concat(ldm(r8, rcx, 0), ldm(r9, rax, 0)), op_rr(57, r8, r9))), jcc(cc_ne, nel),
+    CI(list_concat(list_concat(mov_rr(r10, r8), alu_imm(4, r10, 255)), alu_imm(7, r10, 3))), jcc(cc_e, rec.l),
+    CI(alu_imm(7, r10, 4)), jcc(cc_ne, deep),
+    CLab(rec.l), CI(list_concat(list_concat(ldm(r10, rcx, 8), ldm(rdx, rax, 8)), op_rr(57, r10, rdx))), jcc(cc_ne, nel),
+    CI(list_concat(list_concat(shift(5, r8, 8), lea(r9, rcx, 16)), lea(r10, rax, 16))),
+    CLab(lp.l), CI(alu_imm(7, r8, 0)), jcc(cc_e, eql),
+    CI(list_concat(list_concat(ldm(rdx, r9, 0), ldm(rcx, r10, 0)), op_rr(57, rdx, rcx))), jcc(cc_ne, dif.l),
+    CI(list_concat(list_concat(alu_imm(0, r9, 8), alu_imm(0, r10, 8)), alu_imm(5, r8, 1))), jmp(lp.l),
+    CLab(dif.l), CI(list_concat(op_rr(9, rdx, rcx), test_low(rdx, 1))), jcc(cc_ne, nel), jmp(deep)]))
+end
+
 fn cg_prim(cx: Cx, g: G, env: List[Bind], pos: Pos, name: String, args: List[Expr]) -> G
   if eq(name, "prim_tag") then
     let p = new_label(g)
@@ -900,6 +918,51 @@ fn cg_prim(cx: Cx, g: G, env: List[Bind], pos: Pos, name: String, args: List[Exp
     let g1 = cg(cx, push_mixed(cx, g, env, list_slice(args, 0, 2), [0]), env, unwrap_or(list_get(args, 2), EInt(pos, 0)), false)
     let g2 = slot_base(eb(g1, list_concat(list_concat(pop_r(rdx), pop_r(rcx)), list_concat(shift(7, rdx, 1), shift(4, rdx, 3)))))
     emit(eb(g2, list_concat(op_rr(1, rcx, rdx), store(rcx, 0, rax))), unit_rax())
+  elif eq(name, "prim_eq_flat") then
+    # 0 = equal, 1 = not equal, 2 = undecided (needs the deep comparison); records/ctors compared word by word
+    let g1 = eb(cg_borrow(cx, push_mixed(cx, g, env, list_slice(args, 0, 1), [0]), env, unwrap_or(list_get(args, 1), EInt(pos, 0))), pop_r(rcx))
+    let eql = new_label(g1)
+    let nel = new_label(eql.g)
+    let deep = new_label(nel.g)
+    let fin = new_label(deep.g)
+    emit(eq_flat_code(fin.g, eql.l, nel.l, deep.l), cat([CLab(eql.l), CI(mov_imm64(rax, 1)), jmp(fin.l),
+      CLab(nel.l), CI(mov_imm64(rax, 3)), jmp(fin.l), CLab(deep.l), CI(mov_imm64(rax, 5)), CLab(fin.l)]))
+  elif eq(name, "prim_find_flat") then
+    # first index j in [i, n) whose slot is equal to x or needs the deep comparison; n if none
+    let g1 = cg(cx, push_mixed(cx, g, env, list_slice(args, 0, 3), [0, 1]), env, unwrap_or(list_get(args, 3), EInt(pos, 0)), false)
+    let g2 = eb(g1, list_concat(list_concat(list_concat(pop_r(rcx), pop_r(rdx)), pop_r(r8)), list_concat(list_concat(shift(7, rcx, 1), shift(7, rax, 1)),
+      list_concat(list_concat(ldm(rsi, r8, 8), mov_rr(rdi, rcx)), list_concat(shift(4, rdi, 3), op_rr(1, rsi, rdi))))))
+    let g3 = eb(g2, list_concat(list_concat(mov_rr(rdi, rax), op_rr(41, rdi, rcx)), list_concat(push_r(rax), push_r(rdx))))
+    let lp = new_label(g3)
+    let nxt = new_label(lp.g)
+    let stop = new_label(nxt.g)
+    let g4 = emit(stop.g, cat([CLab(lp.l), CI(alu_imm(7, rdi, 0)), jcc(cc_e, stop.l), CI(list_concat(ldm(rcx, rsi, 0), ldm(rax, rsp, 0)))]))
+    emit(eq_flat_code(g4, stop.l, nxt.l, stop.l), cat([CLab(nxt.l), CI(list_concat(list_concat(alu_imm(0, rsi, 8), alu_imm(5, rdi, 1)), [])), jmp(lp.l),
+      CLab(stop.l), CI(list_concat(list_concat(pop_r(rdx), pop_r(rax)), list_concat(op_rr(41, rax, rdi), tag_rax())))]))
+  elif eq(name, "prim_copy_slots") then
+    # dst[doff + k] := src[soff + k] for k < n, count + 1 on copied objects
+    let g1 = cg(cx, push_mixed(cx, g, env, list_slice(args, 0, 4), [0, 2]), env, unwrap_or(list_get(args, 4), EInt(pos, 0)), false)
+    let g2 = eb(g1, list_concat(list_concat(list_concat(pop_r(rdx), pop_r(r8)), list_concat(pop_r(r9), pop_r(r10))),
+      list_concat(list_concat(list_concat(mov_rr(rcx, rax), shift(7, rcx, 1)), list_concat(shift(7, rdx, 1), shift(4, rdx, 3))),
+        list_concat(list_concat(ldm(rsi, r8, 8), op_rr(1, rsi, rdx)), list_concat(list_concat(shift(7, r9, 1), shift(4, r9, 3)), list_concat(ldm(rdi, r10, 8), op_rr(1, rdi, r9)))))))
+    let lp = new_label(g2)
+    let skip = new_label(lp.g)
+    let fin = new_label(skip.g)
+    emit(fin.g, cat([CLab(lp.l), CI(alu_imm(7, rcx, 0)), jcc(cc_e, fin.l), CI(list_concat(ldm(rdx, rsi, 0), store(rdi, 0, rdx))),
+      CI([ITst1(rdx)]), jcc(cc_ne, skip.l), CI([IAddM(rdx, -8, 1)]), CLab(skip.l),
+      CI(list_concat(list_concat(alu_imm(0, rsi, 8), alu_imm(0, rdi, 8)), alu_imm(5, rcx, 1))), jmp(lp.l), CLab(fin.l), unit_rax()]))
+  elif eq(name, "prim_slot_cmp") then
+    # slot i of a and b as raw words, no RC: 0 = same word, 1 = differ and one is an Int, 2 = both pointers
+    let g1 = cg(cx, push_mixed(cx, g, env, list_slice(args, 0, 2), [0, 1]), env, unwrap_or(list_get(args, 2), EInt(pos, 0)), false)
+    let g2 = slot_base(eb(g1, list_concat(list_concat(list_concat(pop_r(rdx), pop_r(rcx)), list_concat(shift(7, rax, 1), shift(4, rax, 3))),
+      list_concat(mov_rr(r8, rax), push_r(rdx)))))
+    let g3 = slot_base(eb(g2, list_concat(list_concat(op_rr(1, rcx, r8), ldm(r9, rcx, 0)), pop_r(rcx))))
+    let diff = new_label(eb(g3, list_concat(op_rr(1, rcx, r8), ldm(r10, rcx, 0))))
+    let one = new_label(diff.g)
+    let done = new_label(one.g)
+    emit(done.g, cat([CI(op_rr(57, r9, r10)), jcc(cc_ne, diff.l), CI(mov_imm64(rax, 1)), jmp(done.l), CLab(diff.l),
+      CI(list_concat(list_concat(mov_rr(rdx, r9), op_rr(9, rdx, r10)), test_low(rdx, 1))), jcc(cc_ne, one.l), CI(mov_imm64(rax, 5)), jmp(done.l),
+      CLab(one.l), CI(mov_imm64(rax, 3)), CLab(done.l)]))
   elif eq(name, "prim_byte") then eb(borrow2(cx, g, env, args), list_concat(list_concat(shift(7, rax, 1), op_rr(1, rax, rcx)), list_concat(movzx_byte(rax, rax, 8), tag_rax())))
   elif eq(name, "prim_set_byte") then
     let g1 = cg(cx, push_mixed(cx, g, env, list_slice(args, 0, 2), [0]), env, unwrap_or(list_get(args, 2), EInt(pos, 0)), false)
