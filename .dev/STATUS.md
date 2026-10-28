@@ -4,6 +4,7 @@ Current step: 0028 done — Haiku GPLM re-run: 10/12 first try (targeted errors 
 Next step:    specs where Python-typical errors appear (None, missed cases, multi-file edits), or Phase 3
 
 ## Reserved steps
+0029 — T1a: infix operators and grouping (this session)
 
 ## Quick check
 ```

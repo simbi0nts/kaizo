@@ -9,6 +9,31 @@ Evidence for the theory so far: 2 blind tests (v1: 0 fix rounds; v2 pending).
 The theory being tested (specs.md): an LLM-first language lets humans stay out of code and review.
 So every phase ends with a *measurement*, not just features.
 
+## Direction (2026-10-28, after steps 0023–0028): a token-optimized, general-purpose tool for agents
+Goal set by the user: one toolchain an AI agent uses for backend, frontend, low-level and high-level
+apps, optimized for **token usage**. Human readability is not a criterion; syntax is chosen only by
+measured agent cost (tokens per task, first-try error rate, fix rounds).
+
+Evidence that drives the order (0023–0028): vs Python, GPLM costs 1.17–1.44x total tokens and
+1.26–1.5x program size; the reference adds ~6k prompt tokens per task; every Haiku GPLM error was a
+familiar habit the call-only syntax rejects (`==`, inline `if` without `end`, `OPS`).
+
+Gate for every step: evals with ≥3 runs per spec (evals/variance.py); target ≤ Python on total tokens
+and on first-try correctness. Milestones, in order:
+- **T1 Lean syntax** — infix operators (desugared to the existing builtins), loops over
+  ranges/lists, char literals, string interpolation, method-call style; each measured.
+- **T2 Lean reference** — core LANGUAGE.md ≤ ~1.5k tokens; `kaizo doc <name>` / `kaizo api` give
+  signatures on demand, so libraries add no prompt tokens until used.
+- **T3 Lean repair loop** — one-line JSON diagnostics with a suggested fix; agents re-send only the
+  changed function, not the whole file.
+- **T4 Frontend: wasm32 target** — code generator + tiny JS loader with DOM bindings (`libs/dom`);
+  test app: a browser UI talking to a GPLM backend.
+- **T5 General-purpose libraries** — json, http client/server, storage, floats, time; low-level:
+  raw memory/FFI behind an effect.
+- **T6 Full-stack eval** — the same app (backend + frontend) built by agents in GPLM vs
+  Python+TypeScript, compared on tokens and correctness.
+Phases 3–6 below remain valid; their items are pulled in by these milestones.
+
 ## Phase 0 — Consolidate — done (0016–0019; CI green on all four targets)
 - Push to GitHub, make CI green on real Windows/macOS runners; fix what they find.
 - Resolve open branches: 0006 (blind test v1), list_sort_by (renumber, rebuild seed), blind test v2 results.
