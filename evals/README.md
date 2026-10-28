@@ -17,6 +17,9 @@ acceptance test). `score.sh <spec> <command...>` runs a candidate against the hi
    `{"date", "batch", "spec", "arm", "model", "total_tokens", "wall_s", "lines", "fix_rounds", "hidden_passed",
      "hidden_total", "check_errors", "runtime_errors", "notes", "program_chars"}` (`total_tokens`/`wall_s` may be null when usage was not reported); candidates go to `runs/<date>-<batch>/`.
 5. `python3 evals/report.py` prints the comparison table.
+6. Repeats: run each spec ≥3 times per arm (field `"run"`); `evals/variance.py gplm=<batches> python=<batches>`
+   pools them. Program size varies 4–13% between runs (step 0026), so report a language change's
+   effect only when it exceeds the observed min–max range.
 
 The point is the comparison under identical conditions, so keep the prompts, the feedback and the
 limits the same for every arm. Change the protocol only with a new .dev step.

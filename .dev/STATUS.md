@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0025 done — try, variadic builtins, read_all; GPLM −7.6% chars where used, still 1.22x Python
-Next step:    repeated eval runs (variance), then iteration form / char literals, or Phase 3 libraries
+Current step: 0026 done — 3 runs/spec: GPLM 1.26x chars, 1.97x time vs Python; 24/24 solved; size cv 4-13%
+Next step:    iteration form / char literals (measure with >=3 runs), or Phase 3 libraries, or harder correctness evals
 
 ## Reserved steps
-0026 — repeated eval runs: variance on batch 2 specs (this session)
 
 ## Quick check
 ```
