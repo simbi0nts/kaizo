@@ -4,6 +4,7 @@ Current step: 0025 done — try, variadic builtins, read_all; GPLM −7.6% chars
 Next step:    repeated eval runs (variance), then iteration form / char literals, or Phase 3 libraries
 
 ## Reserved steps
+0026 — repeated eval runs: variance on batch 2 specs (this session)
 
 ## Quick check
 ```
