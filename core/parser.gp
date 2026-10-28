@@ -58,11 +58,18 @@ fn desc(t: Tok) -> String
   end
 end
 
+# hint for a token that only an operator language would put here
+fn op_hint(t: Tok) -> String
+  if list_contains(["=", "==", "!=", "<", ">", "<=", ">=", "+", "*", "/", "%", "&&", "||", "!", "&", "|"], t.text) then
+    "GPLM has no operators: comparisons and arithmetic are calls, e.g. eq(a, b), ne(a, b), lt(a, b), add(a, b), not(p)"
+  else "" end
+end
+
 fn need(st: PS, s: String, ctx: String) -> PS
   if is_p(st, s) then
     adv(st)
   else
-    let hint = if eq(s, "end") then "every fn, type, test, if, match and lambda is closed by its own `end`" else "" end
+    let hint = if eq(s, "end") then "every fn, type, test, if, match and lambda is closed by its own `end`" else op_hint(peek(st)) end
     fail(st, str_join(["expected \"", s, "\" ", ctx, ", found ", desc(peek(st))], ""), hint)
   end
 end
@@ -72,7 +79,8 @@ fn take_kind(st: PS, kind: TokKind, what: String, ctx: String) -> Got[Tok]
   if eq(t.kind, kind) then
     Got { v: t, st: adv(st) }
   else
-    Got { v: t, st: fail(st, str_join(["expected ", what, " ", ctx, ", found ", desc(t)], ""), "") }
+    let hint = if and(eq(kind, TkIdent), eq(t.kind, TkUpper)) then str_cat("values, functions and constants are lower_snake: write ", str_lower(t.text), ", not ", t.text) else op_hint(t) end
+    Got { v: t, st: fail(st, str_join(["expected ", what, " ", ctx, ", found ", desc(t)], ""), hint) }
   end
 end
 

@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0027 done — Haiku: Python 12/12 first try, GPLM 9/12 (errors from GPLM syntax/semantics); diag fixed
-Next step:    re-run Haiku GPLM after the fixes; correctness tasks where Python's own errors show up
+Current step: 0028 done — Haiku GPLM re-run: 10/12 first try (targeted errors gone, new habits); operator/naming hints
+Next step:    specs where Python-typical errors appear (None, missed cases, multi-file edits), or Phase 3
 
 ## Reserved steps
-0028 — re-run Haiku GPLM arm after the step-0027 fixes (this session)
 
 ## Quick check
 ```
