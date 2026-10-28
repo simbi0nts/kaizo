@@ -3,8 +3,9 @@
 Read this whole file before writing GPLM. It is the complete language.
 
 ## Rules that make GPLM different
-- **No operators.** Every operation is a call: `add(a, mul(b, c))`, `lt(x, 0)`, `and(p, q)`.
-  There is no grouping with `( )`; nest calls instead.
+- **Operators** are sugar for builtins: `+ - * / %` (Int; `/ %` are Euclidean like `div mod`),
+  `== != < <= > >=` (`==` is deep `eq`), `&& || !`, prefix `-`; `( )` groups.
+  Precedence low→high: `||`, `&&`, comparisons, `+ -`, `* / %`, prefix. Strings join with `str_cat`.
 - **Every construct is closed by `end`**: `fn`, `type`, `test`, `if`, `match`, lambda.
 - **Everything is an expression**; a block's value is its last expression. `if` needs `else` and `end`,
   also inline: `exit(if failed then 1 else 0 end)`.
@@ -38,8 +39,8 @@ let width = 20                           # constant, pure
 
 fn area(s: Shape) -> Int                 # params and return type required
   match s
-    case Circle(r) -> mul(3, mul(r, r))
-    case Rect(w, h) -> mul(w, h)
+    case Circle(r) -> 3 * r * r
+    case Rect(w, h) -> w * h
   end
 end
 

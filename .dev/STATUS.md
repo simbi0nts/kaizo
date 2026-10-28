@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0028 done — Haiku GPLM re-run: 10/12 first try (targeted errors gone, new habits); operator/naming hints
-Next step:    specs where Python-typical errors appear (None, missed cases, multi-file edits), or Phase 3
+Current step: 0029 done — T1a infix operators (desugared to builtins); new direction: token-optimized agent toolchain
+Next step:    T1b loops over ranges/lists, char literals, string interpolation; then measure T1
 
 ## Reserved steps
-0029 — T1a: infix operators and grouping (this session)
 
 ## Quick check
 ```

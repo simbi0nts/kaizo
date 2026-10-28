@@ -58,11 +58,9 @@ fn desc(t: Tok) -> String
   end
 end
 
-# hint for a token that only an operator language would put here
+# hint for a token that is a likely slip at this place
 fn op_hint(t: Tok) -> String
-  if list_contains(["=", "==", "!=", "<", ">", "<=", ">=", "+", "*", "/", "%", "&&", "||", "!", "&", "|"], t.text) then
-    "GPLM has no operators: comparisons and arithmetic are calls, e.g. eq(a, b), ne(a, b), lt(a, b), add(a, b), not(p)"
-  else "" end
+  if eq(t.text, "=") then "to compare use ==; a single = only appears in let and type" else "" end
 end
 
 fn need(st: PS, s: String, ctx: String) -> PS
@@ -371,8 +369,66 @@ fn p_field_inits(st: PS, acc: List[FieldInit]) -> Got[List[FieldInit]]
   end
 end
 
+# Infix operators are sugar for the builtins: a + b == add(a, b). Precedence, low to high:
+# || · && · == != < <= > >= · + - · * / % · prefix - !
+fn op_level(t: Tok) -> Int
+  if ne(t.kind, TkPunct) then 0
+  elif eq(t.text, "||") then 1
+  elif eq(t.text, "&&") then 2
+  elif list_contains(["==", "!=", "<", "<=", ">", ">="], t.text) then 3
+  elif or(eq(t.text, "+"), eq(t.text, "-")) then 4
+  elif list_contains(["*", "/", "%"], t.text) then 5
+  else 0 end
+end
+
+fn op_builtin(op: String) -> String
+  match op
+    case "||" -> "or"
+    case "&&" -> "and"
+    case "==" -> "eq"
+    case "!=" -> "ne"
+    case "<" -> "lt"
+    case "<=" -> "le"
+    case ">" -> "gt"
+    case ">=" -> "ge"
+    case "+" -> "add"
+    case "-" -> "sub"
+    case "*" -> "mul"
+    case "/" -> "div"
+    case _ -> "mod"
+  end
+end
+
 fn p_expr(st: PS) -> Got[Expr]
-  p_postfix(p_primary(st))
+  p_binary(st, 1)
+end
+
+fn p_binary(st: PS, min: Int) -> Got[Expr]
+  p_binary_rest(p_unary(st), min)
+end
+
+fn p_binary_rest(left: Got[Expr], min: Int) -> Got[Expr]
+  let t = peek(left.st)
+  let lv = op_level(t)
+  if or(eq(lv, 0), lt(lv, min)) then left
+  else
+    let right = p_binary(adv(left.st), add(lv, 1))
+    let call = ECall(t.pos, EVar(t.pos, op_builtin(t.text)), [left.v, right.v])
+    p_binary_rest(Got { v: call, st: right.st }, min)
+  end
+end
+
+fn p_unary(st: PS) -> Got[Expr]
+  let t = peek(st)
+  if is_p(st, "-") then
+    let x = p_unary(adv(st))
+    Got { v: ECall(t.pos, EVar(t.pos, "sub"), [EInt(t.pos, 0), x.v]), st: x.st }
+  elif is_p(st, "!") then
+    let x = p_unary(adv(st))
+    Got { v: ECall(t.pos, EVar(t.pos, "not"), [x.v]), st: x.st }
+  else
+    p_postfix(p_primary(st))
+  end
 end
 
 fn p_postfix(r: Got[Expr]) -> Got[Expr]
@@ -455,9 +511,11 @@ fn p_primary(st: PS) -> Got[Expr]
         let effs = p_effects(ret)
         let b = p_block(effs.st)
         Got { v: ELam(pos, list_map(ps.v, fn(p) p.name end), b.v), st: need(b.st, "end", "to close fn (lambda)") }
+      elif tok_is(t, "(") then
+        let x = p_expr(st1)
+        Got { v: x.v, st: need(x.st, ")", "to close the parentheses") }
       else
-        let hint = if tok_is(t, "(") then "there is no grouping with parentheses; nest calls instead: add(a, mul(b, c))" else "" end
-        Got { v: EInt(pos, 0), st: fail(st, str_cat("expected an expression, found ", desc(t)), hint) }
+        Got { v: EInt(pos, 0), st: fail(st, str_cat("expected an expression, found ", desc(t)), "") }
       end
   end
 end

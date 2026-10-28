@@ -112,6 +112,22 @@ fn lex_err(x: Lx, pos: Pos, msg: String, hint: String) -> Lexed
   Lexed { toks: TNil, eof: eof, err: Some(Diag { pos: pos, msg: msg, hint: hint }) }
 end
 
+# true when the previous token ends a value, so a following `-` is the minus operator
+fn after_operand(acc: Toks) -> Bool
+  match acc
+    case TNil -> false
+    case TCons(t, _) ->
+      match t.kind
+        case TkIdent -> true
+        case TkUpper -> true
+        case TkInt -> true
+        case TkStr -> true
+        case TkKw -> or(eq(t.text, "true"), eq(t.text, "false"), eq(t.text, "end"))
+        case _ -> list_contains([")", "]", "}"], t.text)
+      end
+  end
+end
+
 fn lex_loop(x: Lx) -> Lexed
   let s = x.src
   let c = byte_at(s, x.i)
@@ -131,7 +147,7 @@ fn lex_loop(x: Lx) -> Lexed
     let text = str_slice(s, x.i, j)
     let kind = if eq(text, "_") then TkPunct elif list_contains(keywords, text) then TkKw elif and(ge(c, 65), le(c, 90)) then TkUpper else TkIdent end
     lex_loop(lx_push(x, kind, text, 0, pos, sub(j, x.i)))
-  elif or(is_digit(c), and(eq(c, 45), is_digit(byte_at(s, add(x.i, 1))))) then
+  elif or(is_digit(c), and(and(eq(c, 45), is_digit(byte_at(s, add(x.i, 1)))), not(after_operand(x.acc)))) then
     let neg = eq(c, 45)
     let d = if neg then add(x.i, 1) else x.i end
     if is_hex_prefix(s, d) then
@@ -159,15 +175,14 @@ fn lex_loop(x: Lx) -> Lexed
     end
   else
     let two = str_slice(s, x.i, add(x.i, 2))
-    if or(eq(two, "->"), eq(two, "..")) then
+    if list_contains(["->", "..", "==", "!=", "<=", ">=", "&&", "||"], two) then
       lex_loop(lx_push(x, TkPunct, two, 0, pos, 2))
     else
       let one = str_slice(s, x.i, add(x.i, 1))
-      if is_some(str_find("()[]{},:.!=|", one)) then
+      if is_some(str_find("()[]{},:.!=|+-*/%<>", one)) then
         lex_loop(lx_push(x, TkPunct, one, 0, pos, 1))
       else
-        let hint = if is_some(str_find("+-*/<>&", one)) then "GPLM has no operators; use calls like add(a, b), lt(a, b), and(a, b)" else "" end
-        lex_err(x, pos, str_join(["unexpected character ", show_char(one)], ""), hint)
+        lex_err(x, pos, str_join(["unexpected character ", show_char(one)], ""), "")
       end
     end
   end

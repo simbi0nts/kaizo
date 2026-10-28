@@ -120,6 +120,18 @@ test "variadic builtins"
   expect_eq(bit_or(1, 2, 4), 7)
 end
 
+test "infix operators"
+  let x = 7
+  expect_eq((x + 3) * 2 - x % 3, 19)
+  expect_eq(x-1, 6)
+  expect_eq([x -1, -1, - x, 1 - -2], [6, -1, -7, 3])
+  expect(x > 3 && !(x == 8) || false, "boolean operators")
+  expect(1 + 2 * 3 == 7, "precedence")
+  expect("a" < "b", "string compare")
+  expect_eq(-7 / 2, -4)
+  expect(x != 8 && x >= 7 && x <= 7, "comparisons")
+end
+
 test "strings"
   expect_eq(str_split("a,b,,c", ","), ["a", "b", "", "c"])
   expect_eq(str_find("hello", "ll"), Some(2))
