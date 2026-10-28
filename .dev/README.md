@@ -69,3 +69,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0022](0022-phase1-exit.md) | Phase 1 exit: blind-test mistakes now all caught before run time | done |
 | [0023](0023-eval-harness.md) | Eval harness + batch 1: GPLM vs Python, 8/8 solved, GPLM 2.2x slower | done |
 | [0024](0024-eval-batch2.md) | Eval batch 2 (calc, csvsum, inventory, jsonfmt): 8/8 again, GPLM 2.3x slower | done |
+| [0025](0025-shorter-gplm.md) | try statement, variadic builtins, read_all; re-measured on batch 2 | done |

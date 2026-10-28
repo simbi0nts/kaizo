@@ -175,6 +175,13 @@ fn read_chunks(fd: Int, acc: List[String]) -> Result[String, String]
   end
 end
 
+# all of standard input in 64 KiB reads; an error counts as the end
+fn os_read_stdin(acc: List[String]) -> String
+  let buf = prim_str_new(65536)
+  let n = sys(0, 0, prim_addr(buf), 65536)
+  if le(n, 0) then str_join(acc, "") else os_read_stdin(list_push(acc, str_slice(buf, 0, n))) end
+end
+
 fn os_read_file(path: String) -> Result[String, String]
   let fd = sys(2, prim_addr(cstr(path)), 0, 0)
   if lt(fd, 0) then Err(str_join(["open ", path, ": ", os_errmsg(fd)], "")) else

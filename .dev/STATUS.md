@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0024 done — eval batch 2 (harder specs): tie again (8/8), GPLM ~2.3x slower, 1.23x larger
-Next step:    shorten GPLM programs (cost finding) or Phase 3 libraries
+Current step: 0025 done — try, variadic builtins, read_all; GPLM −7.6% chars where used, still 1.22x Python
+Next step:    repeated eval runs (variance), then iteration form / char literals, or Phase 3 libraries
 
 ## Reserved steps
-0025 — shorten GPLM programs (eval cost finding) (this session)
 
 ## Quick check
 ```

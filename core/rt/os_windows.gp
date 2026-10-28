@@ -235,6 +235,15 @@ fn read_handle(h: Int, acc: List[String]) -> Result[String, String]
   end
 end
 
+# all of standard input in 64 KiB reads; an error (a closed pipe) counts as the end
+fn os_read_stdin(acc: List[String]) -> String
+  let buf = prim_str_new(65536)
+  let got = zeros(8)
+  let ok = prim_ccall32("ReadFile", [h_in, prim_addr(buf), 65536, prim_addr(got), 0])
+  let n = u_le(got, 0, 4)
+  if or(eq(ok, 0), eq(n, 0)) then str_join(acc, "") else os_read_stdin(list_push(acc, str_slice(buf, 0, n))) end
+end
+
 fn os_read_file(path: String) -> Result[String, String]
   let h = prim_ccall("CreateFileA", [prim_addr(cstr(path)), 0x80000000, 1, 0, 3, 128, 0])
   if eq(h, -1) then Err(str_join(["open ", path, ": ", win_errmsg(last_error())], "")) else

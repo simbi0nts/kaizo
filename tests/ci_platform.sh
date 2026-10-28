@@ -39,6 +39,11 @@ r=$(curl -s -i "http://127.0.0.1:18080/")
 [[ $(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:18080/nope") == 404 ]] && ok "hello-web 404" || bad "hello-web 404"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 
+# read_all on a pipe: 300 KB after a first line read with read_line, then "" at the end
+"$K" build tests/read_all.gp -o "out/read_all$EXE" > /dev/null || bad "build read_all"
+r=$( { echo "head"; head -c 300000 /dev/zero | tr '\0' 'x'; } | "out/read_all$EXE")
+[[ "$r" == "4 300000 0"* ]] && ok "read_all reads a 300 KB pipe" || bad "read_all: $r"
+
 # snake: full terminal test where a pty exists, otherwise the non-terminal message
 "$K" build apps/snake/main.gp -o "out/snake$EXE" > /dev/null || bad "build snake"
 if [[ $T == windows-* ]]; then
