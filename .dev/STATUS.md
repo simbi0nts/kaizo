@@ -4,6 +4,7 @@ Current step: 0026 done — 3 runs/spec: GPLM 1.26x chars, 1.97x time vs Python;
 Next step:    iteration form / char literals (measure with >=3 runs), or Phase 3 libraries, or harder correctness evals
 
 ## Reserved steps
+0027 — correctness evals with a weaker model (Haiku) and fix rounds (this session)
 
 ## Quick check
 ```
