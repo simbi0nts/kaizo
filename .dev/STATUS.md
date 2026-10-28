@@ -4,6 +4,7 @@ Current step: 0024 done — eval batch 2 (harder specs): tie again (8/8), GPLM ~
 Next step:    shorten GPLM programs (cost finding) or Phase 3 libraries
 
 ## Reserved steps
+0025 — shorten GPLM programs (eval cost finding) (this session)
 
 ## Quick check
 ```
