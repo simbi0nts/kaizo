@@ -4,6 +4,7 @@ Current step: 0029 done — T1a infix operators (desugared to builtins); new dir
 Next step:    T1b loops over ranges/lists, char literals, string interpolation; then measure T1
 
 ## Reserved steps
+0030 — performance benchmarks vs C and Rust (this session)
 
 ## Quick check
 ```
