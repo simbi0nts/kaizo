@@ -133,11 +133,18 @@ end
 
 # unify the type of an expression (got) with what the context wants
 fn unify(ts: TS, got: Ty, want: Ty, pos: Pos, what: String) -> TS
+  unify_hint(ts, got, want, pos, what, "")
+end
+
+fn unify_hint(ts: TS, got: Ty, want: Ty, pos: Pos, what: String, hint: String) -> TS
   let r = unify_raw(ts, got, want)
   if r.ok then r.ts else
-    ty_err(ts, pos, str_join(["type mismatch", what, ": expected ", ty_str(zonk(ts, want)), ", got ", ty_str(zonk(ts, got))], ""), "")
+    ty_err(ts, pos, str_join(["type mismatch", what, ": expected ", ty_str(zonk(ts, want)), ", got ", ty_str(zonk(ts, got))], ""), hint)
   end
 end
+
+let try_hint = "Option has Some/None, Result has Ok/Err; `let x = try e` takes a Result, `let x = try e else v` takes an Option"
+let try_block_hint = "try hands the Err on as the value of the enclosing block, so that block (e.g. the fn body) must be a Result; use match to handle the error here"
 
 # ---------- annotations -> types ----------
 
@@ -394,6 +401,9 @@ fn check(ts: TS, env: List[TBind], e: Expr, want: Ty) -> TS
       let el = fresh(ts)
       let ts1 = unify(el.ts, t_list(el.ty), want, pos, "")
       list_fold(items, ts1, fn(acc, it) check(acc, env, it, el.ty) end)
+    case ECall(pos, ECtor(_, "Err"), [EVar(_, "try_err")]) ->
+      let got = infer(ts, env, e)
+      unify_hint(got.ts, got.ty, want, pos, "", try_block_hint)
     case _ ->
       let got = infer(ts, env, e)
       unify(got.ts, got.ty, want, expr_pos(e), "")
@@ -534,6 +544,10 @@ end
 
 # ---------- patterns ----------
 
+fn ctor_hint(n: String) -> String
+  if list_contains(["Ok", "Err", "Some", "None"], n) then try_hint else "" end
+end
+
 fn bind_pat(ts: TS, env: List[TBind], p: Pat, t: Ty) -> TE
   match p
     case PWild(_) -> TE { ts: ts, env: env }
@@ -545,11 +559,11 @@ fn bind_pat(ts: TS, env: List[TBind], p: Pat, t: Ty) -> TE
       let c = instantiate_ctor(ts, n)
       match c.ty
         case TF(ps, res, _) ->
-          let ts1 = unify(c.ts, res, t, pos, str_cat(" in pattern ", n))
+          let ts1 = unify_hint(c.ts, res, t, pos, str_cat(" in pattern ", n), ctor_hint(n))
           list_fold(list_range(0, list_len(args)), TE { ts: ts1, env: env }, fn(acc, i)
             bind_pat(acc.ts, acc.env, unwrap_or(list_get(args, i), PWild(pos)), unwrap_or(list_get(ps, i), t_int()))
           end)
-        case res -> TE { ts: unify(c.ts, res, t, pos, str_cat(" in pattern ", n)), env: env }
+        case res -> TE { ts: unify_hint(c.ts, res, t, pos, str_cat(" in pattern ", n), ctor_hint(n)), env: env }
       end
     case PList(pos, items, rest) ->
       let el = fresh(ts)

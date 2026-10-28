@@ -50,7 +50,7 @@ let builtin_list = [
   b("list_slice", 3, ""), b("list_reverse", 1, ""), b("list_range", 2, ""), b("list_contains", 2, ""),
   b("list_map", 2, ""), b("list_filter", 2, ""), b("list_fold", 3, ""), b("list_sort", 1, ""), b("list_sort_by", 2, ""),
   b("panic", 1, ""), b("expect", 2, ""), b("expect_eq", 2, ""), b("embed_file", 1, ""),
-  b("print", 1, "io"), b("println", 1, "io"), b("read_line", 0, "io"), b("args", 0, "io"), b("exit", 1, "io"), b("env_get", 1, "io"),
+  b("print", 1, "io"), b("println", 1, "io"), b("read_line", 0, "io"), b("read_all", 0, "io"), b("args", 0, "io"), b("exit", 1, "io"), b("env_get", 1, "io"),
   b("term_raw", 0, "term"), b("term_restore", 0, "term"), b("term_key", 0, "term"),
   b("now_ms", 0, "time"), b("sleep_ms", 1, "time"),
   b("tcp_listen", 1, "net"), b("tcp_accept", 1, "net"), b("tcp_read", 3, "net"), b("tcp_write", 2, "net"), b("tcp_close", 1, "net"), b("unix_connect", 1, "net"),

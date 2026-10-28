@@ -11,6 +11,7 @@ Read this whole file before writing GPLM. It is the complete language.
 - **No loops.** Use recursion. A call in tail position (last expression of a body,
   of an `if` branch or `match` arm) is a tail call and runs in constant stack.
 - **No exceptions.** Fallible operations return `Result[T, E]` (`Ok`/`Err`) or `Option[T]` (`Some`/`None`).
+  `try` passes failures on without a `match` (see Blocks).
 - **Effects are declared.** A fn that (directly) calls an effectful builtin or fn must list
   the effect: `fn main() -> Unit ! [io, time]`. Effects: `io`, `term`, `time`, `net`, `fs`, `proc`.
   Top-level `let` must be pure. `test` blocks may use any effect.
@@ -78,6 +79,18 @@ end
 Blocks (bodies of fn/test/if/case/lambda) are a sequence of statements:
 `let name = expr` or `expr`. The last statement must be an expression.
 
+`try` statements (the rest of the block runs only on success; otherwise the block's value is the failure):
+```
+fn parse_pair(s: String) -> Result[Int, String]
+  let a = try parse_int(s)                           # Result: on Err(e) the block is Err(e)
+  let n = try str_to_int(s) else Err("not a number") # Option: on None the block is the else value
+  try check(n)                                       # Result[Unit, E] or any Result, value ignored
+  Ok(add(a, n))
+end
+```
+`try` ends the *enclosing block* (a fn body, an `if` branch, a `case` arm), so that block must have
+the failure's type (here `Result[Int, String]`). `try` cannot be the last statement.
+
 ## Patterns
 `_` · `name` (binds) · `42` · `"s"` · `true` · `Ctor` · `Ctor(p1, p2)` ·
 `[]` · `[a, b]` (exact length) · `[first, ..rest]` (rest is a list; `.._` ignores it).
@@ -86,6 +99,8 @@ Blocks (bodies of fn/test/if/case/lambda) are a sequence of statements:
 Pure:
 - Int: `add sub mul div mod` (div/mod are Euclidean: `mod(-7, 3) = 2`)
 - Compare: `eq ne` (deep, any values) · `lt le gt ge` (Int or String) · Bool: `not and or`
+- Variadic: `add mul str_cat and or bit_and bit_or bit_xor` take 2 or more arguments:
+  `add(a, b, c)`, `str_cat("line ", show(n), ": ", msg)`, `or(p, q, r)`
 - Bits: `bit_and bit_or bit_xor` · `bit_shl(x, n)` · `bit_shr(x, n)` (arithmetic) · `target()` → the
   compile target, e.g. `"linux-x64"`, `"windows-x64"`, `"macos-x64"`, `"macos-arm64"`
 - Text: `show(v) -> String` (strings unchanged, others printed) · `str_cat(a, b)` ·
@@ -104,7 +119,8 @@ Pure:
 - Compile time: `embed_file("path")` → the file's contents as a String (path relative to the source file)
 
 Effectful:
-- `io`: `print(s)` `println(s)` `read_line() -> Option[String]` `args() -> List[String]` ·
+- `io`: `print(s)` `println(s)` `read_line() -> Option[String]` (without the `\n`) ·
+  `read_all() -> String` (all of standard input, bytes unchanged) · `args() -> List[String]` ·
   `exit(code)` · `env_get(name) -> Option[String]`
 - `term`: `term_raw() -> Result[Unit, String]` (no echo, no line buffering, hidden cursor;
   the core restores the terminal on every exit) · `term_restore()` ·

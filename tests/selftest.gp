@@ -86,6 +86,40 @@ test "list_sort_by: stable, empty, large"
   expect(ok, "10k sorted by x, ties in input order")
 end
 
+fn try_int(s: String) -> Result[Int, String]
+  let n = try str_to_int(s) else Err(str_cat("not a number: ", s))
+  Ok(n)
+end
+
+fn try_sum(a: String, b: String) -> Result[Int, String]
+  let x = try try_int(a)
+  let y = try try_int(b)
+  Ok(add(x, y))
+end
+
+fn try_unit(a: String) -> Result[String, String]
+  try try_int(a)
+  Ok("ok")
+end
+
+test "try"
+  expect_eq(try_sum("2", "3"), Ok(5))
+  expect_eq(try_sum("2", "x"), Err("not a number: x"))
+  expect_eq(try_sum("y", "x"), Err("not a number: y"))
+  expect_eq(try_unit("1"), Ok("ok"))
+  expect_eq(try_unit("z"), Err("not a number: z"))
+end
+
+test "variadic builtins"
+  expect_eq(add(1, 2, 3, 4), 10)
+  expect_eq(mul(2, 3, 4), 24)
+  expect_eq(str_cat("a", "b", show(1), "c"), "ab1c")
+  expect(and(true, true, true), "and of three")
+  expect(not(and(true, false, true)), "and with a false")
+  expect(or(false, false, true), "or of three")
+  expect_eq(bit_or(1, 2, 4), 7)
+end
+
 test "strings"
   expect_eq(str_split("a,b,,c", ","), ["a", "b", "", "c"])
   expect_eq(str_find("hello", "ll"), Some(2))

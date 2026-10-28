@@ -6,7 +6,7 @@ type Toks = TNil | TCons(Tok, Toks) end
 type Lexed = { toks: Toks, eof: Tok, err: Option[Diag] } end
 type Lx = { src: String, file: String, i: Int, line: Int, col: Int, acc: Toks } end
 
-let keywords = ["fn", "end", "let", "if", "then", "elif", "else", "match", "case", "type", "test", "import", "with", "true", "false"]
+let keywords = ["fn", "end", "let", "if", "then", "elif", "else", "match", "case", "type", "test", "import", "with", "try", "true", "false"]
 
 fn is_letter(c: Int) -> Bool
   or(and(ge(c, 97), le(c, 122)), and(ge(c, 65), le(c, 90)))

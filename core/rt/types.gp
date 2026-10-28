@@ -58,6 +58,7 @@ fn embed_file(path: String) -> String Unit end
 fn print(s: String) -> Unit ! [io] Unit end
 fn println(s: String) -> Unit ! [io] Unit end
 fn read_line() -> Option[String] ! [io] Unit end
+fn read_all() -> String ! [io] Unit end
 fn args() -> List[String] ! [io] Unit end
 fn exit(code: Int) -> Unit ! [io] Unit end
 fn env_get(name: String) -> Option[String] ! [io] Unit end

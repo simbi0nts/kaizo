@@ -619,6 +619,15 @@ fn read_line() -> Option[String]
   read_line_loop([])
 end
 
+fn read_all_loop(acc: List[Int]) -> String
+  let c = os_read_byte()
+  if lt(c, 0) then str_from_bytes(acc) else read_all_loop(list_push(acc, c)) end
+end
+
+fn read_all() -> String
+  read_all_loop([])
+end
+
 fn args() -> List[String]
   os_args()
 end

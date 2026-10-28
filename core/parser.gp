@@ -277,11 +277,65 @@ fn p_stmts(st: PS, acc: List[Stmt]) -> Got[List[Stmt]]
   elif is_p(st, "let") then
     let pos = peek(st).pos
     let n = p_ident(adv(st), "after let")
-    let x = p_expr(need(n.st, "=", "in let"))
-    p_stmts(x.st, list_push(acc, Stmt { pos: pos, let_name: n.v.text, x: x.v }))
+    let st2 = need(n.st, "=", "in let")
+    if is_p(st2, "try") then
+      p_try(adv(st2), peek(st2).pos, PVar(n.v.pos, n.v.text), acc)
+    else
+      let x = p_expr(st2)
+      p_stmts(x.st, list_push(acc, Stmt { pos: pos, let_name: n.v.text, x: x.v }))
+    end
+  elif is_p(st, "try") then
+    p_try(adv(st), peek(st).pos, PWild(peek(st).pos), acc)
   else
     let x = p_expr(st)
     p_stmts(x.st, list_push(acc, Stmt { pos: expr_pos(x.v), let_name: "", x: x.v }))
+  end
+end
+
+# `let x = try e` + rest  ->  match e case Ok(x) -> rest case Err(err) -> Err(err) end
+# `let x = try e else alt` + rest  ->  match e case Some(x) -> rest case None -> alt end
+# The rest of the block becomes the success arm, so `try` ends the enclosing block early.
+fn p_try(st: PS, pos: Pos, bind: Pat, acc: List[Stmt]) -> Got[List[Stmt]]
+  let x = p_expr(st)
+  let alt = if is_p(x.st, "else") then Some(p_expr(adv(x.st))) else None end
+  let st2 = match alt
+    case Some(a) -> a.st
+    case None -> x.st
+  end
+  let rest = p_stmts(st2, [])
+  # rc.gp keys arms and statements by source position: each generated node needs its own
+  let xp = expr_pos(x.v)
+  let arms = match alt
+    case Some(a) -> [Arm { pat: PCtor(pos, "Some", [bind]), body: rest.v }, Arm { pat: PCtor(xp, "None", []), body: [Stmt { pos: expr_pos(a.v), let_name: "", x: a.v }] }]
+    case None -> [Arm { pat: PCtor(pos, "Ok", [bind]), body: rest.v }, Arm { pat: PCtor(xp, "Err", [PVar(xp, "try_err")]), body: [Stmt { pos: xp, let_name: "", x: ECall(xp, ECtor(xp, "Err"), [EVar(xp, "try_err")]) }] }]
+  end
+  let out = Got { v: list_push(acc, Stmt { pos: pos, let_name: "", x: EMatch(pos, x.v, arms) }), st: rest.st }
+  match list_get(rest.v, sub(list_len(rest.v), 1))
+    case None -> Got { v: out.v, st: fail_at(rest.st, pos, "try needs more statements after it: the rest of the block runs when it succeeds", "use match for the last value of a block") }
+    case Some(last) ->
+      if ne(last.let_name, "") then
+        Got { v: out.v, st: fail_at(rest.st, last.pos, "block ends with a let; the last statement must be the value of the block", "add the expression to return after the let") }
+      else
+        out
+      end
+  end
+end
+
+# variadic forms of associative builtins: add(a, b, c) = add(a, add(b, c))
+let variadic = ["add", "mul", "str_cat", "and", "or", "bit_and", "bit_or", "bit_xor"]
+
+fn fold_call(pos: Pos, f: Expr, args: List[Expr]) -> Expr
+  match args
+    case [a, b] -> ECall(pos, f, [a, b])
+    case [a, ..rest] -> ECall(pos, f, [a, fold_call(pos, f, rest)])
+    case [] -> ECall(pos, f, [])
+  end
+end
+
+fn make_call(pos: Pos, f: Expr, args: List[Expr]) -> Expr
+  match f
+    case EVar(_, n) -> if and(gt(list_len(args), 2), list_contains(variadic, n)) then fold_call(pos, f, args) else ECall(pos, f, args) end
+    case _ -> ECall(pos, f, args)
   end
 end
 
@@ -313,7 +367,7 @@ end
 fn p_postfix(r: Got[Expr]) -> Got[Expr]
   if is_p(r.st, "(") then
     let args = p_expr_list(adv(r.st), ")", "to close the call arguments", [])
-    p_postfix(Got { v: ECall(expr_pos(r.v), r.v, args.v), st: args.st })
+    p_postfix(Got { v: make_call(expr_pos(r.v), r.v, args.v), st: args.st })
   elif is_p(r.st, ".") then
     let pos = peek(r.st).pos
     let n = p_ident(adv(r.st), "after .")

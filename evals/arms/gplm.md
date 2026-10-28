@@ -5,7 +5,7 @@ Rules of this exercise:
 - You cannot run anything. After you answer, the orchestrator compiles and tests your file and may
   send you the compiler's diagnostics or a failing test's output; then answer with the corrected file.
 - Command-line arguments: `args()` returns them without the program name.
-- Read all of standard input with repeated `read_line()` (it returns `None` at the end).
+- Read all of standard input with `read_all()`, or line by line with `read_line()` (it returns `None` at the end).
 - Exit codes: `exit(n)`.
 
 --- GPLM reference ---
