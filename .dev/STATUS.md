@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0023 done — eval harness; batch 1: tie on correctness (8/8), GPLM costlier
-Next step:    harder eval specs (batch 2), then Phase 3 libraries
+Current step: 0024 done — eval batch 2 (harder specs): tie again (8/8), GPLM ~2.3x slower, 1.23x larger
+Next step:    shorten GPLM programs (cost finding) or Phase 3 libraries
 
 ## Reserved steps
-0024 — eval batch 2: harder specs (this session)
 
 ## Quick check
 ```

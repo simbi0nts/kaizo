@@ -15,7 +15,7 @@ acceptance test). `score.sh <spec> <command...>` runs a candidate against the hi
    At most 3 fix rounds.
 4. Record one line in `results.jsonl`:
    `{"date", "batch", "spec", "arm", "model", "total_tokens", "wall_s", "lines", "fix_rounds", "hidden_passed",
-     "hidden_total", "check_errors", "runtime_errors", "notes"}`; candidates go to `runs/<date>-<batch>/`.
+     "hidden_total", "check_errors", "runtime_errors", "notes", "program_chars"}` (`total_tokens`/`wall_s` may be null when usage was not reported); candidates go to `runs/<date>-<batch>/`.
 5. `python3 evals/report.py` prints the comparison table.
 
 The point is the comparison under identical conditions, so keep the prompts, the feedback and the
