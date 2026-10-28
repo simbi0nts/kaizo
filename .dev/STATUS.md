@@ -4,6 +4,7 @@ Current step: 0027 done — Haiku: Python 12/12 first try, GPLM 9/12 (errors fro
 Next step:    re-run Haiku GPLM after the fixes; correctness tasks where Python's own errors show up
 
 ## Reserved steps
+0028 — re-run Haiku GPLM arm after the step-0027 fixes (this session)
 
 ## Quick check
 ```
