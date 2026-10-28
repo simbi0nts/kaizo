@@ -71,3 +71,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0024](0024-eval-batch2.md) | Eval batch 2 (calc, csvsum, inventory, jsonfmt): 8/8 again, GPLM 2.3x slower | done |
 | [0025](0025-shorter-gplm.md) | try statement, variadic builtins, read_all; re-measured on batch 2 | done |
 | [0026](0026-eval-variance.md) | 3 runs per spec: noise 4–13%, GPLM 1.26x size / 1.97x time; 0025 effect within noise | done |
+| [0027](0027-eval-weaker-model.md) | Haiku evals: Python 12/12 first try vs GPLM 9/12; missing-`end` diagnostic | done |

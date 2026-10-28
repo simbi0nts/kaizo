@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0026 done — 3 runs/spec: GPLM 1.26x chars, 1.97x time vs Python; 24/24 solved; size cv 4-13%
-Next step:    iteration form / char literals (measure with >=3 runs), or Phase 3 libraries, or harder correctness evals
+Current step: 0027 done — Haiku: Python 12/12 first try, GPLM 9/12 (errors from GPLM syntax/semantics); diag fixed
+Next step:    re-run Haiku GPLM after the fixes; correctness tasks where Python's own errors show up
 
 ## Reserved steps
-0027 — correctness evals with a weaker model (Haiku) and fix rounds (this session)
 
 ## Quick check
 ```

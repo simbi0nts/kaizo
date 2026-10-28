@@ -286,6 +286,9 @@ fn p_stmts(st: PS, acc: List[Stmt]) -> Got[List[Stmt]]
     end
   elif is_p(st, "try") then
     p_try(adv(st), peek(st).pos, PWild(peek(st).pos), acc)
+  elif or(is_p(st, ")"), is_p(st, ","), is_p(st, "]"), is_p(st, "}")) then
+    # a block (if/match/fn body) ran into the closer of an enclosing call or list: its `end` is missing
+    Got { v: acc, st: fail(st, str_cat("expected end to close the block, found ", desc(peek(st))), "if/match/lambda blocks end with `end`, also inside a call: exit(if c then 1 else 0 end)") }
   else
     let x = p_expr(st)
     p_stmts(x.st, list_push(acc, Stmt { pos: expr_pos(x.v), let_name: "", x: x.v }))

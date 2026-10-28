@@ -6,7 +6,8 @@ Read this whole file before writing GPLM. It is the complete language.
 - **No operators.** Every operation is a call: `add(a, mul(b, c))`, `lt(x, 0)`, `and(p, q)`.
   There is no grouping with `( )`; nest calls instead.
 - **Every construct is closed by `end`**: `fn`, `type`, `test`, `if`, `match`, lambda.
-- **Everything is an expression**; a block's value is its last expression. `if` needs `else`.
+- **Everything is an expression**; a block's value is its last expression. `if` needs `else` and `end`,
+  also inline: `exit(if failed then 1 else 0 end)`.
 - **Immutable values.** `let` binds once. Update records with `{ r with f: v }`.
 - **No loops.** Use recursion. A call in tail position (last expression of a body,
   of an `if` branch or `match` arm) is a tail call and runs in constant stack.
@@ -97,7 +98,8 @@ the failure's type (here `Result[Int, String]`). `try` cannot be the last statem
 
 ## Builtins (core)
 Pure:
-- Int: `add sub mul div mod` (div/mod are Euclidean: `mod(-7, 3) = 2`)
+- Int: `add sub mul div mod` (div/mod are Euclidean: `mod(-7, 3) = 2`, `div(-7, 2) = -4`; for C-style
+  truncation divide the absolute values and fix the sign)
 - Compare: `eq ne` (deep, any values) · `lt le gt ge` (Int or String) · Bool: `not and or`
 - Variadic: `add mul str_cat and or bit_and bit_or bit_xor` take 2 or more arguments:
   `add(a, b, c)`, `str_cat("line ", show(n), ": ", msg)`, `or(p, q, r)`
