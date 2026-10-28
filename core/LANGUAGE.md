@@ -3,7 +3,7 @@
 Read this whole file before writing GPLM. It is the complete language.
 
 ## Rules that make GPLM different
-- **Operators** are sugar for builtins: `+ - * / %` (Int; `/ %` are Euclidean like `div mod`),
+- **Operators** are sugar for builtins: `+ - * / %` (Int; `/ %` are floored like `div mod`),
   `== != < <= > >=` (`==` is deep `eq`), `&& || !`, prefix `-`; `( )` groups.
   Precedence low→high: `||`, `&&`, comparisons, `+ -`, `* / %`, prefix. Strings join with `str_cat`.
 - **Every construct is closed by `end`**: `fn`, `type`, `test`, `if`, `match`, lambda.
@@ -99,8 +99,8 @@ the failure's type (here `Result[Int, String]`). `try` cannot be the last statem
 
 ## Builtins (core)
 Pure:
-- Int: `add sub mul div mod` (div/mod are Euclidean: `mod(-7, 3) = 2`, `div(-7, 2) = -4`; for C-style
-  truncation divide the absolute values and fix the sign)
+- Int: `add sub mul div mod` (div/mod are floored like Python: `mod(-7, 3) = 2`, `div(-7, 2) = -4`; for
+  C-style truncation divide the absolute values and fix the sign)
 - Compare: `eq ne` (deep, any values) · `lt le gt ge` (Int or String) · Bool: `not and or`
 - Variadic: `add mul str_cat and or bit_and bit_or bit_xor` take 2 or more arguments:
   `add(a, b, c)`, `str_cat("line ", show(n), ": ", msg)`, `or(p, q, r)`

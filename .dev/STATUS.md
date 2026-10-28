@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0029 done — T1a infix operators (desugared to builtins); new direction: token-optimized agent toolchain
-Next step:    T1b loops over ranges/lists, char literals, string interpolation; then measure T1
+Current step: 0030 done — benchmarks vs C/Rust: server 0.77x, render3d 17x, game 243x slower (56x same algorithm)
+Next step:    T1b (loops, char literals, interpolation) or performance (arrays/maps, unboxed Int codegen)
 
 ## Reserved steps
-0030 — performance benchmarks vs C and Rust (this session)
 
 ## Quick check
 ```

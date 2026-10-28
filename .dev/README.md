@@ -74,3 +74,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0027](0027-eval-weaker-model.md) | Haiku evals: Python 12/12 first try vs GPLM 9/12; missing-`end` diagnostic | done |
 | [0028](0028-haiku-rerun.md) | Haiku GPLM re-run: 10/12 first try, fixed errors gone; operator and naming hints | done |
 | [0029](0029-infix-operators.md) | T1a: infix operators + grouping, desugared to builtins | done |
+| [0030](0030-benchmarks.md) | Benchmarks vs C/Rust: server 0.77x, render3d 17x, game 243x slower | done |
