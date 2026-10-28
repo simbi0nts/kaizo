@@ -1,10 +1,9 @@
 # Current status
 
-Current step: 0031 done — profiler + runtime quick wins: game 243x→53x vs C; render3d 17x (needs in-place updates)
-Next step:    in-place update of uniquely owned values (list_set/push, record update), then allocation reuse
+Current step: 0032 done — in-place list_set: render3d 4.5x C (was 17x), game 16.5x (was 243x), server 0.82x
+Next step:    codegen: drop proven Int tag checks, registers for loop variables (or back to T1b syntax)
 
 ## Reserved steps
-0032 — in-place update of uniquely owned values (this session)
 
 ## Quick check
 ```

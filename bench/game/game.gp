@@ -1,81 +1,87 @@
-type P = { x: Int, y: Int } end
-type G = { body: List[P], dir: Int, food: P, score: Int, rng: Int } end
-type St = { g: G, games: Int, total: Int, sum: Int } end
+# Snake with arrays: occupancy grid + ring buffer, updated in place with list_set (see SPEC.md)
+type Out = { games: Int, total: Int, sum: Int } end
 
 let gw = 32
 let gh = 24
+let cap = 769
+let big = 1000000007
 
 fn next(r: Int) -> Int
   (r * 1103515245 + 12345) % 2147483648
 end
 
-fn step(p: P, d: Int) -> P
-  if d == 0 then P { x: p.x, y: p.y - 1 }
-  elif d == 1 then P { x: p.x + 1, y: p.y }
-  elif d == 2 then P { x: p.x, y: p.y + 1 }
-  else P { x: p.x - 1, y: p.y } end
+fn at(body: List[Int], hi: Int, k: Int) -> Int
+  list_get_or(body, (hi + k) % cap, 0)
 end
 
-fn place(body: List[P], r: Int) -> G
-  let r1 = next(r)
-  let r2 = next(r1)
-  let f = P { x: r1 % gw, y: r2 % gh }
-  if list_contains(body, f) then place(body, r2)
-  else G { body: body, dir: 1, food: f, score: 0, rng: r2 } end
+fn free(occ: List[Bool], body: List[Int], hi: Int, len: Int, x: Int, y: Int) -> Bool
+  if x < 0 || x >= gw || y < 0 || y >= gh then false
+  elif x * gh + y == at(body, hi, len - 1) then true
+  else !list_get_or(occ, x * gh + y, true) end
 end
 
-fn new_game(r: Int) -> G
-  place([P { x: 16, y: 12 }, P { x: 15, y: 12 }, P { x: 14, y: 12 }], r)
+fn step_x(x: Int, d: Int) -> Int
+  if d == 1 then x + 1 elif d == 3 then x - 1 else x end
 end
 
-fn head(g: G) -> P
-  unwrap_or(list_get(g.body, 0), P { x: 0, y: 0 })
+fn step_y(y: Int, d: Int) -> Int
+  if d == 0 then y - 1 elif d == 2 then y + 1 else y end
 end
 
-fn free(g: G, p: P) -> Bool
-  p.x >= 0 && p.x < gw && p.y >= 0 && p.y < gh && !list_contains(list_slice(g.body, 0, list_len(g.body) - 1), p)
-end
-
-fn choose(g: G, cands: List[Int]) -> Int
+fn choose(occ: List[Bool], body: List[Int], hi: Int, len: Int, dir: Int, hx: Int, hy: Int, cands: List[Int]) -> Int
   match cands
-    case [] -> g.dir
+    case [] -> dir
     case [d, ..rest] ->
-      if d != (g.dir + 2) % 4 && free(g, step(head(g), d)) then d else choose(g, rest) end
+      if d != (dir + 2) % 4 && free(occ, body, hi, len, step_x(hx, d), step_y(hy, d)) then d
+      else choose(occ, body, hi, len, dir, hx, hy, rest) end
   end
 end
 
-fn candidates(g: G) -> List[Int]
-  let h = head(g)
-  let hx = if g.food.x > h.x then [1] elif g.food.x < h.x then [3] else [] end
-  let vy = if g.food.y > h.y then [2] elif g.food.y < h.y then [0] else [] end
-  list_concat(list_concat(hx, vy), [0, 1, 2, 3])
+fn new_game(rng: Int, games: Int, total: Int, sum: Int, n: Int) -> Out
+  let occ = list_set(list_set(list_set(list_fill(gw * gh, false), 16 * gh + 12, true), 15 * gh + 12, true), 14 * gh + 12, true)
+  let body = list_set(list_set(list_set(list_fill(cap, 0), 0, 16 * gh + 12), 1, 15 * gh + 12), 2, 14 * gh + 12)
+  place(occ, body, 0, 3, 1, 0, rng, games, total, sum, n)
 end
 
-fn tick(s: St) -> St
-  let g = s.g
-  let d = choose(g, candidates(g))
-  let nh = step(head(g), d)
-  if !free(g, nh) then
-    let ng = new_game(g.rng)
-    let h = head(ng)
-    St { g: ng, games: s.games + 1, total: s.total + g.score, sum: (s.sum * 31 + h.x * 32 + h.y) % 1000000007 }
-  elif nh == g.food then
-    let grown = list_cons(nh, g.body)
-    let placed = place(grown, g.rng)
-    let ng = { placed with dir: d, score: g.score + 1 }
-    St { g: ng, games: s.games, total: s.total, sum: (s.sum * 31 + nh.x * 32 + nh.y) % 1000000007 }
+fn place(occ: List[Bool], body: List[Int], hi: Int, len: Int, dir: Int, score: Int, rng: Int, games: Int, total: Int, sum: Int, n: Int) -> Out
+  let r1 = next(rng)
+  let r2 = next(r1)
+  let x = r1 % gw
+  let y = r2 % gh
+  if list_get_or(occ, x * gh + y, true) then place(occ, body, hi, len, dir, score, r2, games, total, sum, n)
+  else run(occ, body, hi, len, dir, x, y, score, r2, games, total, sum, n) end
+end
+
+fn run(occ: List[Bool], body: List[Int], hi: Int, len: Int, dir: Int, fx: Int, fy: Int, score: Int, rng: Int, games: Int, total: Int, sum: Int, n: Int) -> Out
+  if n == 0 then Out { games: games, total: total + score, sum: sum }
   else
-    let moved = list_cons(nh, list_slice(g.body, 0, list_len(g.body) - 1))
-    St { g: { g with body: moved, dir: d }, games: s.games, total: s.total, sum: (s.sum * 31 + nh.x * 32 + nh.y) % 1000000007 }
+    let h = at(body, hi, 0)
+    let hx = h / gh
+    let hy = h % gh
+    let c1 = if fx > hx then [1] elif fx < hx then [3] else [] end
+    let c2 = if fy > hy then [2] elif fy < hy then [0] else [] end
+    let d = choose(occ, body, hi, len, dir, hx, hy, list_concat(list_concat(c1, c2), [0, 1, 2, 3]))
+    let nx = step_x(hx, d)
+    let ny = step_y(hy, d)
+    if !free(occ, body, hi, len, nx, ny) then
+      new_game(rng, games + 1, total + score, (sum * 31 + 16 * 32 + 12) % big, n - 1)
+    else
+      let nh = nx * gh + ny
+      let s2 = (sum * 31 + nx * 32 + ny) % big
+      let hi2 = (hi + cap - 1) % cap
+      if nx == fx && ny == fy then
+        place(list_set(occ, nh, true), list_set(body, hi2, nh), hi2, len + 1, d, score + 1, rng, games, total, s2, n - 1)
+      else
+        let tail = at(body, hi, len - 1)
+        let occ2 = list_set(list_set(occ, tail, false), nh, true)
+        run(occ2, list_set(body, hi2, nh), hi2, len, d, fx, fy, score, rng, games, total, s2, n - 1)
+      end
+    end
   end
-end
-
-fn run(s: St, n: Int) -> St
-  if n == 0 then s else run(tick(s), n - 1) end
 end
 
 fn main() -> Unit ! [io]
-  let n = unwrap_or(str_to_int(unwrap_or(list_get(args(), 0), "200000")), 200000)
-  let s = run(St { g: new_game(42), games: 0, total: 0, sum: 0 }, n)
-  println(str_cat("games ", show(s.games), " total ", show(s.total + s.g.score), " checksum ", show(s.sum)))
+  let n = list_get_or(list_map(args(), fn(a) unwrap_or(str_to_int(a), 200000) end), 0, 200000)
+  let o = new_game(42, 0, 0, 0, n)
+  println(str_cat("games ", show(o.games), " total ", show(o.total), " checksum ", show(o.sum)))
 end

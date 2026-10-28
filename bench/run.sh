@@ -12,7 +12,6 @@ for app in game render3d; do
   "$RUSTC" -C opt-level=3 -o $B/${app}_rs bench/$app/$app.rs
   $K build bench/$app/$app.gp -o $B/${app}_gp > /dev/null
 done
-gcc -O2 -o $B/game_list_c bench/game/game_list.c
 gcc -O2 -o $B/server_c bench/server/server.c 2>/dev/null
 "$RUSTC" -C opt-level=3 -o $B/server_rs bench/server/server.rs
 $K build bench/server/server.gp -o $B/server_gp > /dev/null
@@ -34,11 +33,6 @@ for app in game render3d; do
   [ "$oc" = "$or_" ] && [ "$oc" = "$og" ] || echo "OUTPUT MISMATCH $app: $oc / $or_ / $og"
   awk -v a=$app -v n=$arg -v c=$tc -v r=$tr -v g=$tg 'BEGIN{printf "| %s (%s) | time s | %.3f | %.3f | %.3f | %.1fx | %.1fx |\n", a, n, c, r, g, g/c, g/r}'
   echo "| $app | max RSS KB | $mc | $mr | $mg | | |"
-  if [ $app = game ]; then
-    read tl ml ol < <(best $B/game_list_c $arg)
-    [ "$ol" = "$oc" ] || echo "OUTPUT MISMATCH game_list: $ol"
-    awk -v l=$tl -v g=$tg 'BEGIN{printf "| game, C with GPLM data structures | time s | %.3f | | | %.1fx | |\n", l, g/l}'
-  fi
 done
 port=18300
 for lang in c rs gp; do

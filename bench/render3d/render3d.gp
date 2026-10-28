@@ -53,51 +53,62 @@ fn cube_tris(t: Int, i: Int) -> List[Tri]
   list_filter(all, fn(tr) (tr.b.x - tr.a.x) * (tr.c.y - tr.a.y) - (tr.b.y - tr.a.y) * (tr.c.x - tr.a.x) < 0 end)
 end
 
-fn edge(p: V, q: V, y: Int, acc: List[Int]) -> List[Int]
-  if p.y == q.y then acc
-  elif y >= min(p.y, q.y) && y <= max(p.y, q.y) then list_cons(p.x + (y - p.y) * (q.x - p.x) / (q.y - p.y), acc)
-  else acc end
+fn edge_x(p: V, q: V, y: Int) -> Int
+  p.x + (y - p.y) * (q.x - p.x) / (q.y - p.y)
 end
 
-fn span(tr: Tri, y: Int) -> Option[Seg]
-  let xs = edge(tr.a, tr.b, y, edge(tr.b, tr.c, y, edge(tr.c, tr.a, y, [])))
-  match xs
-    case [] -> None
-    case [x, ..rest] ->
-      let lo = list_fold(rest, x, fn(m, v) min(m, v) end)
-      let hi = list_fold(rest, x, fn(m, v) max(m, v) end)
-      let x0 = max(0, lo)
-      let x1 = min(319, hi)
-      if x0 > x1 then None else Some(Seg { x0: x0, x1: x1, c: tr.color }) end
+fn on_edge(p: V, q: V, y: Int) -> Bool
+  p.y != q.y && y >= min(p.y, q.y) && y <= max(p.y, q.y)
+end
+
+# fill x0..x1 of row y with c
+fn fill_span(fb: List[Int], row: Int, x: Int, x1: Int, c: Int) -> List[Int]
+  if x > x1 then fb else fill_span(list_set(fb, row + x, c), row, x + 1, x1, c) end
+end
+
+fn fill_row(fb: List[Int], tr: Tri, y: Int) -> List[Int]
+  let e1 = on_edge(tr.a, tr.b, y)
+  let e2 = on_edge(tr.b, tr.c, y)
+  let e3 = on_edge(tr.c, tr.a, y)
+  if !(e1 || e2 || e3) then fb
+  else
+    let x1 = if e1 then edge_x(tr.a, tr.b, y) else 0 end
+    let x2 = if e2 then edge_x(tr.b, tr.c, y) else 0 end
+    let x3 = if e3 then edge_x(tr.c, tr.a, y) else 0 end
+    let lo = min(if e1 then x1 else 100000 end, min(if e2 then x2 else 100000 end, if e3 then x3 else 100000 end))
+    let hi = max(if e1 then x1 else -100000 end, max(if e2 then x2 else -100000 end, if e3 then x3 else -100000 end))
+    fill_span(fb, y * 320, max(0, lo), min(319, hi), tr.color)
   end
 end
 
-# segs: front-most first; the colour of x is the first segment covering it
-fn pixel(segs: List[Seg], x: Int) -> Int
-  match segs
-    case [] -> 0
-    case [s, ..rest] -> if x >= s.x0 && x <= s.x1 then s.c else pixel(rest, x) end
+fn fill_rows(fb: List[Int], tr: Tri, y: Int, y1: Int) -> List[Int]
+  if y > y1 then fb else fill_rows(fill_row(fb, tr, y), tr, y + 1, y1) end
+end
+
+fn draw(fb: List[Int], tris: List[Tri]) -> List[Int]
+  match tris
+    case [] -> fb
+    case [tr, ..rest] ->
+      let y0 = max(0, min(tr.a.y, min(tr.b.y, tr.c.y)))
+      let y1 = min(239, max(tr.a.y, max(tr.b.y, tr.c.y)))
+      draw(fill_rows(fb, tr, y0, y1), rest)
   end
 end
 
-fn row_sum(segs: List[Seg], y: Int, x: Int, acc: Int) -> Int
+fn sum_row(fb: List[Int], i: Int, x: Int, y: Int, acc: Int) -> Int
   if x == 320 then acc
-  else row_sum(segs, y, x + 1, (acc + pixel(segs, x) * (x + 1 + y)) % 1000000007) end
+  else sum_row(fb, i + 1, x + 1, y, (acc + list_get_or(fb, i, 0) * (x + 1 + y)) % 1000000007) end
+end
+
+fn sum_pixels(fb: List[Int], y: Int, acc: Int) -> Int
+  if y == 240 then acc else sum_pixels(fb, y + 1, sum_row(fb, y * 320, 0, y, acc)) end
 end
 
 fn frame(t: Int) -> Int
   let all = list_concat(list_concat(cube_tris(t, 0), cube_tris(t, 1)), list_concat(cube_tris(t, 2), cube_tris(t, 3)))
-  # front-most first: nearest depth first; ties: later triangle first (it is drawn last)
-  let front = list_sort_by(all, fn(p, q) p.depth < q.depth || (p.depth == q.depth && p.ord > q.ord) end)
-  list_fold(list_range(0, 240), 0, fn(acc, y)
-    let segs = list_fold(list_reverse(front), [], fn(ss, tr)
-      match span(tr, y)
-        case Some(s) -> list_cons(s, ss)
-        case None -> ss
-      end
-    end)
-    if eq(list_len(segs), 0) then acc else (acc + row_sum(segs, y, 0, 0)) % 1000000007 end
-  end)
+  # farthest first; ties: earlier triangle first
+  let order = list_sort_by(all, fn(p, q) p.depth > q.depth || (p.depth == q.depth && p.ord < q.ord) end)
+  sum_pixels(draw(list_fill(76800, 0), order), 0, 0)
 end
 
 fn run(t: Int, n: Int, total: Int) -> Int
@@ -105,6 +116,6 @@ fn run(t: Int, n: Int, total: Int) -> Int
 end
 
 fn main() -> Unit ! [io]
-  let n = unwrap_or(str_to_int(unwrap_or(list_get(args(), 0), "120")), 120)
+  let n = list_get_or(list_map(args(), fn(a) unwrap_or(str_to_int(a), 120) end), 0, 120)
   println(str_cat("checksum ", show(run(0, n, 0))))
 end

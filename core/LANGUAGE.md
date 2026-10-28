@@ -112,7 +112,9 @@ Pure:
   `str_starts(s, prefix)` · `str_ends(s, suffix)` · `str_repeat(s, n)` · `str_lower` ·
   `str_to_int(s) -> Option[Int]` · `str_byte(s, i) -> Int` · `str_from_bytes(List[Int]) -> String`
 - List: `list_len` · `list_get(l, i) -> Option[T]` · `list_cons(x, l)` (prepend) ·
-  `list_push(l, x)` (append) · `list_concat(a, b)` · `list_slice(l, from, to)` ·
+  `list_push(l, x)` (append) · `list_concat(a, b)` · `list_slice(l, from, to)` (O(1) view) ·
+  `list_set(l, i, x)` (copy with l[i] = x; **in place, O(1), when l is not shared**) · `list_fill(n, x)` ·
+  `list_get_or(l, i, default)` (no Option; `unwrap_or(list_get(l, i), d)` compiles to it) ·
   `list_reverse` · `list_range(from, to)` (to excluded) · `list_contains(l, x)` ·
   `list_map(l, f)` · `list_filter(l, f)` · `list_fold(l, init, fn(acc, x) ... end)` · `list_sort` (Int/String) ·
   `list_sort_by(l, before)`: stable merge sort, `before: Fn(T, T) -> Bool` is strict "a goes before b";
@@ -147,6 +149,8 @@ Types and constructors are global (no two modules may define the same name).
 - When several record types share a field name and nothing tells the checker which one an
   expression is, it asks for an annotation (give the function parameter or result a type).
 - Memory is managed automatically (reference counting inferred by the compiler, step 0013); nothing to write.
+  For in-place updates pass a list on as its last use (`fill(list_set(buf, i, c), ...)`); a list read
+  from a record field is shared with the record, so `list_set` on it copies.
 - Targets: Linux x86-64, Windows x64, macOS x86-64 and arm64.
 - A local `let` lambda cannot call itself; write a top-level fn for recursion.
 

@@ -424,6 +424,38 @@ fn list_get(l: List[Int], i: Int) -> Option[Int]
   if or(lt(i, 0), ge(i, prim_len(l))) then None else Some(prim_slot(l, i)) end
 end
 
+fn list_get_or(l: List[Int], i: Int, d: Int) -> Int
+  need(l, 2, "list_get_or", "List")
+  if or(lt(i, 0), ge(i, prim_len(l))) then d else prim_slot(l, i) end
+end
+
+# in place when l is not shared (count 1, not a view); otherwise on a copy
+fn list_set(l: List[Int], i: Int, x: Int) -> List[Int]
+  let n = prim_len(l)
+  if or(lt(i, 0), ge(i, n)) then l
+  elif prim_unique(l) then
+    prim_swap_slot(l, i, x)
+    l
+  else
+    let r = copy_into(prim_list_new(n), 0, l, 0, n)
+    prim_swap_slot(r, i, x)
+    r
+  end
+end
+
+fn fill_loop(r: List[Int], x: Int, i: Int, n: Int) -> List[Int]
+  if ge(i, n) then r else
+    prim_set_slot(r, i, x)
+    fill_loop(r, x, add(i, 1), n)
+  end
+end
+
+fn list_fill(n: Int, x: Int) -> List[Int]
+  let r = prim_list_new(max(n, 0))
+  prim_fill(r, x, max(n, 0))
+  r
+end
+
 fn copy_into(dst: List[Int], doff: Int, src: List[Int], i: Int, n: Int) -> List[Int]
   if ge(i, n) then dst else
     prim_copy_slots(dst, add(doff, i), src, i, sub(n, i))

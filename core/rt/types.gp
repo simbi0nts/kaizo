@@ -39,6 +39,9 @@ fn str_byte(s: String, i: Int) -> Int Unit end
 fn str_from_bytes(l: List[Int]) -> String Unit end
 fn list_len(l: List[A]) -> Int Unit end
 fn list_get(l: List[A], i: Int) -> Option[A] Unit end
+fn list_get_or(l: List[A], i: Int, d: A) -> A Unit end
+fn list_set(l: List[A], i: Int, x: A) -> List[A] Unit end
+fn list_fill(n: Int, x: A) -> List[A] Unit end
 fn list_cons(x: A, l: List[A]) -> List[A] Unit end
 fn list_push(l: List[A], x: A) -> List[A] Unit end
 fn list_concat(a: List[A], b: List[A]) -> List[A] Unit end

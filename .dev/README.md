@@ -76,3 +76,4 @@ Long-term plan: [ROADMAP.md](ROADMAP.md)
 | [0029](0029-infix-operators.md) | T1a: infix operators + grouping, desugared to builtins | done |
 | [0030](0030-benchmarks.md) | Benchmarks vs C/Rust: server 0.77x, render3d 17x, game 243x slower | done |
 | [0031](0031-perf-quick-wins.md) | Sampling profiler; fast equality, bulk copy, slice views: game 243x→53x vs C | done |
+| [0032](0032-in-place-updates.md) | In-place list_set for unshared lists: render3d 4.5x C, game 16.5x | done |

@@ -48,7 +48,7 @@ let builtin_list = [
   b("str_repeat", 2, ""), b("str_lower", 1, ""), b("str_to_int", 1, ""), b("str_byte", 2, ""), b("str_from_bytes", 1, ""),
   b("list_len", 1, ""), b("list_get", 2, ""), b("list_cons", 2, ""), b("list_push", 2, ""), b("list_concat", 2, ""),
   b("list_slice", 3, ""), b("list_reverse", 1, ""), b("list_range", 2, ""), b("list_contains", 2, ""),
-  b("list_map", 2, ""), b("list_filter", 2, ""), b("list_fold", 3, ""), b("list_sort", 1, ""), b("list_sort_by", 2, ""),
+  b("list_map", 2, ""), b("list_filter", 2, ""), b("list_fold", 3, ""), b("list_sort", 1, ""), b("list_sort_by", 2, ""), b("list_set", 3, ""), b("list_fill", 2, ""), b("list_get_or", 3, ""),
   b("panic", 1, ""), b("expect", 2, ""), b("expect_eq", 2, ""), b("embed_file", 1, ""),
   b("print", 1, "io"), b("println", 1, "io"), b("read_line", 0, "io"), b("read_all", 0, "io"), b("args", 0, "io"), b("exit", 1, "io"), b("env_get", 1, "io"),
   b("term_raw", 0, "term"), b("term_restore", 0, "term"), b("term_key", 0, "term"),
@@ -64,7 +64,7 @@ let prim_list = [
   b("prim_byte", 2, ""), b("prim_set_byte", 3, ""), b("prim_str_new", 1, ""), b("prim_list_new", 1, ""),
   b("prim_list_view", 3, ""), b("prim_record_copy", 1, ""), b("prim_addr", 1, ""), b("prim_peek", 1, ""),
   b("prim_syscall", 7, ""), b("prim_ctor_name", 1, ""), b("prim_record_name", 1, ""), b("prim_field_name", 2, ""),
-  b("prim_argc", 0, ""), b("prim_argv", 0, ""), b("prim_envp", 0, ""), b("prim_ccall", 2, ""), b("prim_ccall32", 2, ""), b("prim_handle", 1, ""), b("prim_term_save", 1, ""), b("prim_peek8", 1, ""), b("prim_copy", 5, ""), b("prim_slot_cmp", 3, ""), b("prim_eq_flat", 2, ""), b("prim_find_flat", 4, ""), b("prim_copy_slots", 5, "")
+  b("prim_argc", 0, ""), b("prim_argv", 0, ""), b("prim_envp", 0, ""), b("prim_ccall", 2, ""), b("prim_ccall32", 2, ""), b("prim_handle", 1, ""), b("prim_term_save", 1, ""), b("prim_peek8", 1, ""), b("prim_copy", 5, ""), b("prim_slot_cmp", 3, ""), b("prim_eq_flat", 2, ""), b("prim_find_flat", 4, ""), b("prim_copy_slots", 5, ""), b("prim_unique", 1, ""), b("prim_swap_slot", 3, ""), b("prim_fill", 3, "")
 ]
 
 fn table(l: List[Builtin]) -> Map[Builtin]

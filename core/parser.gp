@@ -343,7 +343,15 @@ end
 
 fn make_call(pos: Pos, f: Expr, args: List[Expr]) -> Expr
   match f
-    case EVar(_, n) -> if and(gt(list_len(args), 2), list_contains(variadic, n)) then fold_call(pos, f, args) else ECall(pos, f, args) end
+    case EVar(vp, n) ->
+      if and(gt(list_len(args), 2), list_contains(variadic, n)) then fold_call(pos, f, args)
+      elif eq(n, "unwrap_or") then
+        # unwrap_or(list_get(l, i), d) reads without allocating an Option
+        match args
+          case [ECall(_, EVar(_, "list_get"), [l, i]), d] -> ECall(pos, EVar(vp, "list_get_or"), [l, i, d])
+          case _ -> ECall(pos, f, args)
+        end
+      else ECall(pos, f, args) end
     case _ -> ECall(pos, f, args)
   end
 end

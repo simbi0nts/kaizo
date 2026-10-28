@@ -132,6 +132,23 @@ test "infix operators"
   expect(x != 8 && x >= 7 && x <= 7, "comparisons")
 end
 
+fn set_all(b: List[Int], i: Int, n: Int) -> List[Int]
+  if i == n then b else set_all(list_set(b, i % 10, i), i + 1, n) end
+end
+
+test "list_set, list_fill, list_get_or"
+  let a = list_fill(3, 0)
+  let b = list_set(a, 0, 9)
+  expect_eq([a, b], [[0, 0, 0], [9, 0, 0]])
+  expect_eq(list_set(list_slice(b, 1, 3), 0, 5), [5, 0])
+  expect_eq(list_set(["x", "y"], 1, "z"), ["x", "z"])
+  expect_eq(list_set(a, 7, 1), [0, 0, 0])
+  expect_eq(unwrap_or(list_get([1, 2], 5), 42), 42)
+  expect_eq(list_get_or([1, 2], 1, 0), 2)
+  expect_eq(set_all(list_fill(10, 0), 0, 100000), [99990, 99991, 99992, 99993, 99994, 99995, 99996, 99997, 99998, 99999])
+  expect_eq(list_fill(2, "s"), ["s", "s"])
+end
+
 test "strings"
   expect_eq(str_split("a,b,,c", ","), ["a", "b", "", "c"])
   expect_eq(str_find("hello", "ll"), Some(2))

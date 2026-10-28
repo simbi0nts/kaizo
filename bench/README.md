@@ -9,7 +9,8 @@ markdown table (best of 3 wall times, max RSS, server req/s and p99, binary size
 | render3d | 3D animation: fixed-point transforms, sorting, scanline fill, per-pixel work | render3d/SPEC.md |
 | server | high-load I/O: accept/read/write/close loop, 8 concurrent clients | server/SPEC.md |
 
-Each program is written the way its language makes natural: C and Rust use mutable arrays (grid,
-framebuffer); GPLM has only immutable lists, so it uses lists (`game_list.c` is C with GPLM's data
-structures, to separate code-generation cost from data-structure cost). All are single-threaded.
+All three use the same data structures: a grid/ring buffer (game) and a framebuffer (render3d); GPLM
+updates its lists in place with `list_set` (step 0032). Kept for reference: `game/game_lists.gp`,
+`render3d/render3d_spans.gp` (GPLM before in-place updates) and `game/game_list.c` (C with those
+list-only structures). All are single-threaded.
 Rust uses the standard library only.
