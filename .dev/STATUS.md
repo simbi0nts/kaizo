@@ -4,6 +4,7 @@ Current step: 0031 done — profiler + runtime quick wins: game 243x→53x vs C;
 Next step:    in-place update of uniquely owned values (list_set/push, record update), then allocation reuse
 
 ## Reserved steps
+0032 — in-place update of uniquely owned values (this session)
 
 ## Quick check
 ```
